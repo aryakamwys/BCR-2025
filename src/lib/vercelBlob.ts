@@ -122,6 +122,57 @@ export async function deleteCsvFromBlob(kind: CsvKind): Promise<void> {
       }
     }
   } catch {
-    // Ignore errors in development
+  }
+}
+
+export type AppSettings = {
+  cutoffMs: number | null;
+  catStartMap: Record<string, string>;
+  eventTitle: string;
+};
+
+export async function getSettingsFromBlob(): Promise<AppSettings | null> {
+  if (IS_DEV) {
+    return null;
+  }
+  
+  try {
+    const response = await fetch(`${API_BASE}/settings`);
+    
+    if (!response.ok) {
+      return null;
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      return null;
+    }
+
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function saveSettingsToBlob(settings: AppSettings): Promise<void> {
+  if (IS_DEV) {
+    return;
+  }
+  
+  const response = await fetch(`${API_BASE}/settings`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(settings),
+  });
+
+  if (!response.ok) {
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const error = await response.json().catch(() => ({ error: 'Gagal menyimpan settings' }));
+      throw new Error(error.error || 'Gagal menyimpan settings');
+    }
+    throw new Error('Gagal menyimpan settings');
   }
 }

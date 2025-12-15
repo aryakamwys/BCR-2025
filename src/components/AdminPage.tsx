@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import type { LeaderRow } from "./LeaderboardTable";
 import { CATEGORY_KEYS, DEFAULT_EVENT_TITLE, LS_DATA_VERSION, LS_EVENT_TITLE, type CsvKind } from "../lib/config";
 import { putCsvFile, deleteCsvFile, listCsvMeta } from "../lib/idb";
-import { uploadCsvToBlob, deleteCsvFromBlob, listCsvMetaFromBlob } from "../lib/vercelBlob";
+import { uploadCsvToBlob, deleteCsvFromBlob, listCsvMetaFromBlob, getSettingsFromBlob, saveSettingsToBlob, type AppSettings } from "../lib/vercelBlob";
 import { parseCsv, countDataRows } from "../lib/csvParse";
 
 const ADMIN_USER = "izbat@izbat.org";
@@ -112,7 +112,28 @@ export default function AdminPage({
           setCsvMeta(meta as any);
         }
       } catch {
-        // ignore
+      }
+      
+      if (!import.meta.env.DEV) {
+        try {
+          const settings = await getSettingsFromBlob();
+          if (settings) {
+            if (settings.cutoffMs != null) {
+              setCutoffHours(String(settings.cutoffMs / 3600000));
+              saveCutoffMs(settings.cutoffMs);
+            }
+            if (settings.catStartMap && Object.keys(settings.catStartMap).length > 0) {
+              setCatStart(settings.catStartMap);
+              saveCatStartMap(settings.catStartMap);
+            }
+            if (settings.eventTitle) {
+              setEventTitle(settings.eventTitle);
+              localStorage.setItem(LS_EVENT_TITLE, settings.eventTitle);
+            }
+          }
+        } catch (error) {
+          console.error('Gagal memuat settings dari Blob:', error);
+        }
       }
     })();
   }, [authed]);
@@ -131,11 +152,29 @@ export default function AdminPage({
     }
   };
 
-  const saveEventTitle = () => {
+  const saveAllSettingsToBlob = async (overrides: Partial<AppSettings> = {}) => {
+    if (import.meta.env.DEV) return;
+    
+    const ms = loadCutoffMs();
+    const settings: AppSettings = {
+      cutoffMs: overrides.cutoffMs !== undefined ? overrides.cutoffMs : ms,
+      catStartMap: overrides.catStartMap !== undefined ? overrides.catStartMap : catStart,
+      eventTitle: overrides.eventTitle !== undefined ? overrides.eventTitle : eventTitle,
+    };
+    
+    try {
+      await saveSettingsToBlob(settings);
+    } catch (error) {
+      console.error('Gagal menyimpan settings ke Blob:', error);
+    }
+  };
+
+  const saveEventTitle = async () => {
     const t = (eventTitle || "").trim();
     localStorage.setItem(LS_EVENT_TITLE, t || DEFAULT_EVENT_TITLE);
     bumpDataVersion();
     onConfigChanged();
+    await saveAllSettingsToBlob({ eventTitle: t || DEFAULT_EVENT_TITLE });
     alert("Judul event berhasil diperbarui");
   };
 
@@ -306,12 +345,18 @@ export default function AdminPage({
     setAuthed(false);
   };
 
-  const applyCutoff = () => {
+  const applyCutoff = async () => {
     const h = Number(cutoffHours);
-    if (!Number.isFinite(h) || h <= 0) saveCutoffMs(null);
-    else saveCutoffMs(h * 3600000);
+    let ms: number | null = null;
+    if (!Number.isFinite(h) || h <= 0) {
+      saveCutoffMs(null);
+    } else {
+      ms = h * 3600000;
+      saveCutoffMs(ms);
+    }
 
     onConfigChanged();
+    await saveAllSettingsToBlob({ cutoffMs: ms });
     alert("Cut off time berhasil diperbarui");
   };
 
@@ -323,9 +368,10 @@ export default function AdminPage({
     onConfigChanged();
   };
 
-  const applyCatStart = () => {
+  const applyCatStart = async () => {
     saveCatStartMap(catStart);
     onConfigChanged();
+    await saveAllSettingsToBlob({ catStartMap: catStart });
     alert(
       "Waktu start kategori berhasil diperbarui.\nTotal time akan menggunakan nilai ini per kategori."
     );

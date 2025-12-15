@@ -12,6 +12,7 @@ import {
   loadCheckpointTimesMap,
 } from "./lib/data";
 import { CATEGORY_KEYS, DEFAULT_EVENT_TITLE, LS_EVENT_TITLE, LS_DATA_VERSION } from "./lib/config";
+import { getSettingsFromBlob } from "./lib/vercelBlob";
 import parseTimeToMs, { extractTimeOfDay, formatDuration } from "./lib/time";
 
 const LS_CUTOFF = "imr_cutoff_ms";
@@ -74,11 +75,41 @@ export default function App() {
   const [modalOpen, setModalOpen] = useState(false);
 
   const [recalcTick, setRecalcTick] = useState(0);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
+    if (import.meta.env.DEV) {
+      setSettingsLoaded(true);
+      return;
+    }
+    
     (async () => {
       try {
-        // 🔹 Hanya tampilkan loading screen di load pertama
+        const settings = await getSettingsFromBlob();
+        if (settings) {
+          if (settings.cutoffMs != null) {
+            localStorage.setItem(LS_CUTOFF, String(settings.cutoffMs));
+          }
+          if (settings.catStartMap && Object.keys(settings.catStartMap).length > 0) {
+            localStorage.setItem(LS_CAT_START, JSON.stringify(settings.catStartMap));
+          }
+          if (settings.eventTitle) {
+            localStorage.setItem(LS_EVENT_TITLE, settings.eventTitle);
+            setEventTitle(settings.eventTitle);
+          }
+        }
+      } catch (error) {
+        console.error('Gagal memuat settings dari Blob:', error);
+      }
+      setSettingsLoaded(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    
+    (async () => {
+      try {
         if (!hasLoadedOnce) {
           setState({
             status: "loading",
@@ -285,7 +316,7 @@ export default function App() {
         });
       }
     })();
-  }, [recalcTick, hasLoadedOnce]);
+  }, [recalcTick, hasLoadedOnce, settingsLoaded]);
 
   // 🔁 Refresh when Admin uploads CSV / changes title (cross-tab)
   useEffect(() => {

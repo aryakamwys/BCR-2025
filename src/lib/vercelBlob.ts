@@ -13,7 +13,7 @@ export type CsvMeta = {
 };
 
 export type StoredFile = {
-  key: CsvKind;
+  key: string; // Changed from CsvKind to string for compatibility
   text: string;
   filename: string;
   updatedAt: number;
@@ -22,32 +22,38 @@ export type StoredFile = {
 
 export async function uploadCsvToBlob(
   kind: CsvKind,
-  file: File
+  file: File,
+  eventId: string = 'default'
 ): Promise<PutBlobResult> {
   if (IS_DEV) {
     throw new Error('Vercel Blob tidak tersedia di development mode');
   }
-  
+
   const filename = `${kind}-${Date.now()}-${file.name}`;
-  
+
   const blob = await upload(filename, file, {
     access: 'public',
     contentType: 'text/csv',
-    handleUploadUrl: `${API_BASE}/upload-csv`,
+    handleUploadUrl: `${API_BASE}/upload-csv?eventId=${encodeURIComponent(eventId)}`,
     clientPayload: JSON.stringify({ kind }),
   });
 
   return blob;
 }
 
-export async function getCsvFromBlob(kind: CsvKind): Promise<StoredFile | null> {
+export async function getCsvFromBlob(
+  kind: CsvKind,
+  eventId: string = 'default'
+): Promise<StoredFile | null> {
   if (IS_DEV) {
     return null;
   }
-  
+
   try {
-    const response = await fetch(`${API_BASE}/get-csv?kind=${kind}`);
-    
+    const response = await fetch(
+      `${API_BASE}/get-csv?kind=${kind}&eventId=${encodeURIComponent(eventId)}`
+    );
+
     if (response.status === 404) {
       return null;
     }
@@ -62,11 +68,11 @@ export async function getCsvFromBlob(kind: CsvKind): Promise<StoredFile | null> 
     }
 
     const data = await response.json();
-    
+
     if (!data || !data.text) {
       return null;
     }
-    
+
     const rows = data.text.split('\n').filter((line: string) => line.trim().length > 0).length - 1;
 
     return {
@@ -81,14 +87,16 @@ export async function getCsvFromBlob(kind: CsvKind): Promise<StoredFile | null> 
   }
 }
 
-export async function listCsvMetaFromBlob(): Promise<CsvMeta[]> {
+export async function listCsvMetaFromBlob(eventId: string = 'default'): Promise<CsvMeta[]> {
   if (IS_DEV) {
     return [];
   }
-  
+
   try {
-    const response = await fetch(`${API_BASE}/list-csv`);
-    
+    const response = await fetch(
+      `${API_BASE}/list-csv?eventId=${encodeURIComponent(eventId)}`
+    );
+
     if (!response.ok) {
       return [];
     }
@@ -104,15 +112,21 @@ export async function listCsvMetaFromBlob(): Promise<CsvMeta[]> {
   }
 }
 
-export async function deleteCsvFromBlob(kind: CsvKind): Promise<void> {
+export async function deleteCsvFromBlob(
+  kind: CsvKind,
+  eventId: string = 'default'
+): Promise<void> {
   if (IS_DEV) {
     return;
   }
-  
+
   try {
-    const response = await fetch(`${API_BASE}/delete-csv?kind=${kind}`, {
-      method: 'DELETE',
-    });
+    const response = await fetch(
+      `${API_BASE}/delete-csv?kind=${kind}&eventId=${encodeURIComponent(eventId)}`,
+      {
+        method: 'DELETE',
+      }
+    );
 
     if (!response.ok) {
       const contentType = response.headers.get('content-type');
@@ -130,16 +144,19 @@ export type AppSettings = {
   catStartMap: Record<string, string>;
   eventTitle: string;
   dqMap: Record<string, boolean>;
+  eventId?: string; // Add eventId to settings
 };
 
-export async function getSettingsFromBlob(): Promise<AppSettings | null> {
+export async function getSettingsFromBlob(eventId: string = 'default'): Promise<AppSettings | null> {
   if (IS_DEV) {
     return null;
   }
-  
+
   try {
-    const response = await fetch(`${API_BASE}/settings`);
-    
+    const response = await fetch(
+      `${API_BASE}/settings?eventId=${encodeURIComponent(eventId)}`
+    );
+
     if (!response.ok) {
       return null;
     }
@@ -155,18 +172,24 @@ export async function getSettingsFromBlob(): Promise<AppSettings | null> {
   }
 }
 
-export async function saveSettingsToBlob(settings: AppSettings): Promise<void> {
+export async function saveSettingsToBlob(
+  settings: AppSettings,
+  eventId: string = 'default'
+): Promise<void> {
   if (IS_DEV) {
     return;
   }
-  
-  const response = await fetch(`${API_BASE}/settings`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(settings),
-  });
+
+  const response = await fetch(
+    `${API_BASE}/settings?eventId=${encodeURIComponent(eventId)}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(settings),
+    }
+  );
 
   if (!response.ok) {
     const contentType = response.headers.get('content-type');

@@ -1,12 +1,14 @@
 import { put, list, del } from '@vercel/blob';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const SETTINGS_KEY = 'app-settings.json';
-
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
+  const { eventId } = req.query;
+
+  const event = (eventId && typeof eventId === 'string') ? eventId : 'default';
+
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token) {
     return res.status(500).json({
@@ -16,6 +18,8 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
+      const SETTINGS_KEY = `app-settings-${event}.json`;
+
       const { blobs } = await list({
         prefix: SETTINGS_KEY,
         token,
@@ -27,6 +31,7 @@ export default async function handler(
           catStartMap: {},
           eventTitle: '',
           dqMap: {},
+          eventId: event,
         });
       }
 
@@ -48,12 +53,13 @@ export default async function handler(
   if (req.method === 'POST') {
     try {
       const settings = req.body;
+      const SETTINGS_KEY = `app-settings-${event}.json`; // Add eventId suffix
 
       const { blobs } = await list({
         prefix: SETTINGS_KEY,
         token,
       });
-      
+
       for (const blob of blobs) {
         await del(blob.url, { token });
       }

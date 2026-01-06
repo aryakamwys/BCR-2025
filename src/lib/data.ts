@@ -79,13 +79,13 @@ export type MasterParticipant = {
   sourceCategoryKey: CategoryKey;
 };
 
-async function requireCsvText(kind: "master" | "finish"): Promise<string> {
+async function requireCsvText(kind: "master" | "finish",eventId: string = 'default'): Promise<string> {
   // Try Vercel Blob first, fallback to IndexedDB
-  let file = await getCsvFromBlob(kind);
+  let file = await getCsvFromBlob(kind, eventId);
   if (!file) {
-    file = await getCsvFile(kind);
+    file = await getCsvFile(kind, eventId);
   }
-  
+
   if (!file?.text) {
     throw new Error(
       `CSV '${kind}' belum diupload. Silakan login Admin → Upload CSV.`
@@ -94,23 +94,23 @@ async function requireCsvText(kind: "master" | "finish"): Promise<string> {
   return file.text;
 }
 
-async function getCsvTextOptional(
-  kind: "start" | "checkpoint"
-): Promise<string | null> {
+async function getCsvTextOptional(kind: "start" | "checkpoint",eventId: string = 'default'): Promise<string | null> {
   // Try Vercel Blob first, fallback to IndexedDB
-  let file = await getCsvFromBlob(kind);
+  let file = await getCsvFromBlob(kind, eventId);
   if (!file) {
-    file = await getCsvFile(kind);
+    file = await getCsvFile(kind, eventId);
   }
   return file?.text || null;
 }
 
-export async function loadMasterParticipants(): Promise<{
+export async function loadMasterParticipants(
+  eventId: string = 'default'
+): Promise<{
   all: MasterParticipant[];
   byCategoryKey: Record<string, MasterParticipant[]>;
   byEpc: Map<string, MasterParticipant>;
 }> {
-  const text = await requireCsvText("master");
+  const text = await requireCsvText("master", eventId);
   const grid = parseCsv(text);
   if (!grid || grid.length <= 1) {
     return { all: [], byCategoryKey: {}, byEpc: new Map() };
@@ -165,9 +165,11 @@ export async function loadMasterParticipants(): Promise<{
 
 export type TimeEntry = { ms: number | null; raw: string };
 
-export async function loadTimesMap(kind: "start" | "finish"): Promise<Map<string, TimeEntry>> {
+export async function loadTimesMap(kind: "start" | "finish",eventId: string = 'default'): Promise<Map<string, TimeEntry>> {
   const text =
-    kind === "finish" ? await requireCsvText("finish") : await getCsvTextOptional("start");
+    kind === "finish"
+      ? await requireCsvText("finish", eventId)
+      : await getCsvTextOptional("start", eventId);
   if (!text) {
     // START is optional (can be handled via Category Start Times in Admin)
     return new Map();
@@ -224,12 +226,12 @@ export async function loadTimesMap(kind: "start" | "finish"): Promise<Map<string
   return map;
 }
 
-export async function loadCheckpointTimesMap(): Promise<Map<string, string[]>> {
+export async function loadCheckpointTimesMap(eventId: string = 'default'): Promise<Map<string, string[]>> {
   // checkpoint is optional
   // Try Vercel Blob first, fallback to IndexedDB
-  let file = await getCsvFromBlob("checkpoint");
+  let file = await getCsvFromBlob("checkpoint", eventId);
   if (!file) {
-    file = await getCsvFile("checkpoint");
+    file = await getCsvFile("checkpoint", eventId);
   }
   if (!file?.text) return new Map();
 

@@ -1,10 +1,12 @@
 // src/lib/idb.ts
 // Minimal IndexedDB wrapper to store uploaded CSV texts.
 
-import { DB_NAME, DB_STORE, type CsvKind } from "./config";
+import { DB_NAME, DB_STORE, type CsvKind, DEFAULT_EVENT_ID } from "./config";
 
 type StoredFile = {
-  key: CsvKind;
+  key: string; // Composite key: "{eventId}:{kind}"
+  eventId: string;
+  kind: CsvKind;
   text: string;
   filename: string;
   updatedAt: number;
@@ -44,10 +46,16 @@ export async function putCsvFile(args: {
   text: string;
   filename: string;
   rows: number;
+  eventId?: string;
 }): Promise<void> {
   const db = await openDb();
+  const eventId = args.eventId || DEFAULT_EVENT_ID;
+  const key = `${eventId}:${args.kind}`;
+
   const value: StoredFile = {
-    key: args.kind,
+    key,
+    eventId,
+    kind: args.kind,
     text: args.text,
     filename: args.filename,
     updatedAt: Date.now(),
@@ -57,21 +65,29 @@ export async function putCsvFile(args: {
   db.close();
 }
 
-export async function getCsvFile(kind: CsvKind): Promise<StoredFile | null> {
+export async function getCsvFile(
+  kind: CsvKind,
+  eventId: string = DEFAULT_EVENT_ID
+): Promise<StoredFile | null> {
   const db = await openDb();
-  const result = await tx(db, "readonly", (s) => s.get(kind));
+  const key = `${eventId}:${kind}`;
+  const result = await tx(db, "readonly", (s) => s.get(key));
   db.close();
   return (result as any) || null;
 }
 
-export async function deleteCsvFile(kind: CsvKind): Promise<void> {
+export async function deleteCsvFile(
+  kind: CsvKind,
+  eventId: string = DEFAULT_EVENT_ID
+): Promise<void> {
   const db = await openDb();
-  await tx(db, "readwrite", (s) => s.delete(kind));
+  const key = `${eventId}:${kind}`;
+  await tx(db, "readwrite", (s) => s.delete(key));
   db.close();
 }
 
-export async function listCsvMeta(): Promise<
-  Array<Pick<StoredFile, "key" | "filename" | "updatedAt" | "rows">>
+export async function listCsvMeta(eventId?: string): Promise<
+  Array<Pick<StoredFile, "key" | "kind" | "filename" | "updatedAt" | "rows">>
 > {
   const db = await openDb();
   const result = await new Promise<any[]>((resolve, reject) => {
@@ -83,8 +99,15 @@ export async function listCsvMeta(): Promise<
   });
   db.close();
 
-  return (result || []).map((x: any) => ({
-    key: x.key,
+  let filtered = result || [];
+
+  if (eventId) {
+    filtered = filtered.filter((x: any) => x.eventId === eventId);
+  }
+
+  return filtered.map((x: any) => ({
+    key: x.kind,
+    kind: x.kind,
     filename: x.filename,
     updatedAt: x.updatedAt,
     rows: x.rows,

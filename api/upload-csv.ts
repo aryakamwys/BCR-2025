@@ -10,10 +10,14 @@ export default async function handler(
   }
 
   try {
+    const { eventId } = req.query;
+
+    const event = (eventId && typeof eventId === 'string') ? eventId : 'default';
+
     const protocol = req.headers['x-forwarded-proto'] || 'https';
     const host = req.headers.host || '';
     const url = `${protocol}://${host}${req.url || '/api/upload-csv'}`;
-    
+
     let body: HandleUploadBody;
     if (typeof req.body === 'string') {
       try {
@@ -24,16 +28,16 @@ export default async function handler(
     } else {
       body = req.body as HandleUploadBody;
     }
-    
+
     const requestInit: RequestInit = {
       method: req.method,
       headers: req.headers as HeadersInit,
     };
-    
+
     if (body) {
       requestInit.body = JSON.stringify(body);
     }
-    
+
     const request = new Request(url, requestInit);
 
     const jsonResponse = await handleUpload({
@@ -50,7 +54,7 @@ export default async function handler(
           const match = pathname.match(/(master|start|finish|checkpoint)-/);
           kind = match ? match[1] : undefined;
         }
-        
+
         if (!kind) {
           throw new Error('Parameter kind tidak ditemukan di clientPayload');
         }
@@ -65,6 +69,7 @@ export default async function handler(
           addRandomSuffix: true,
           tokenPayload: JSON.stringify({
             kind,
+            eventId: event, // Add eventId to token payload
             uploadedAt: Date.now(),
           }),
         };
@@ -73,9 +78,9 @@ export default async function handler(
         console.log('CSV upload completed', blob.url, tokenPayload);
 
         try {
-          const { kind } = JSON.parse(tokenPayload || '{}');
-          
-          console.log(`CSV ${kind} uploaded successfully:`, blob.url);
+          const { kind, eventId } = JSON.parse(tokenPayload || '{}');
+
+          console.log(`CSV ${kind} uploaded successfully for event ${eventId}:`, blob.url);
         } catch (error) {
           console.error('Error processing upload completion:', error);
         }

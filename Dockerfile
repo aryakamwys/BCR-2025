@@ -27,8 +27,8 @@ RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml* ./
 COPY prisma ./prisma/
 
-# Install production dependencies only
-RUN pnpm install --prod --frozen-lockfile
+# Install ALL dependencies (including devDependencies needed for tsx)
+RUN pnpm install --frozen-lockfile
 
 # Copy built frontend from builder
 COPY --from=frontend-builder /app/dist ./dist
@@ -36,6 +36,7 @@ COPY --from=frontend-builder /app/dist ./dist
 # Copy server and API files
 COPY server.ts ./
 COPY api ./api
+COPY src ./src
 COPY tsconfig.json ./
 COPY tsconfig.server.json ./
 

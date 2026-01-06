@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml* ./
 
 # Install pnpm and dependencies
-RUN npm install -g pnpm && pnpm install --frozen-lockfile
+RUN npm install -g pnpm && pnpm install
 
 # Copy frontend source
 COPY . .
@@ -28,7 +28,7 @@ COPY package.json pnpm-lock.yaml* ./
 COPY prisma ./prisma/
 
 # Install ALL dependencies (including devDependencies needed for tsx)
-RUN pnpm install --frozen-lockfile
+RUN pnpm install
 
 # Copy built frontend from builder
 COPY --from=frontend-builder /app/dist ./dist

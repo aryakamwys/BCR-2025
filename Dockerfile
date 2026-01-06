@@ -40,9 +40,6 @@ COPY src ./src
 COPY tsconfig.json ./
 COPY tsconfig.server.json ./
 
-# Copy certificate file
-COPY ca/ca.pem ./
-
 # Generate Prisma client
 RUN npx prisma generate
 

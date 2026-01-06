@@ -21,12 +21,6 @@ export default function CategorySection({
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  /**
-   * ✅ Category ranking:
-   * - Finishers: rank 1..N by totalTimeMs
-   * - DNF: tetap diberi rank lanjutan setelah finisher, diurutkan by totalTimeMs
-   * - DSQ: tetap tampil tapi rank null
-   */
   const rankedRows = useMemo(() => {
     const finishers = rows.filter(
       (r) => r.totalTimeDisplay !== "DNF" && r.totalTimeDisplay !== "DSQ"
@@ -73,7 +67,6 @@ export default function CategorySection({
 
   return (
     <div className="category-wrap">
-      {/* Top 10 Preview */}
       <div className="card f1-top10">
         <div className="header-row">
           <div>
@@ -144,7 +137,6 @@ export default function CategorySection({
         </div>
       </div>
 
-      {/* Full Standings */}
       {expanded && (
         <LeaderboardTable
           title={`Full Standings — ${categoryKey}`}

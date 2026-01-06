@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { exportLeaderboardCSV } from "../lib/csv";
 
 export type LeaderRow = {
-  rank: number | null; // can be null for DNF/DSQ
+  rank: number | null;
   bib: string;
   name: string;
   gender: string;
@@ -10,7 +10,7 @@ export type LeaderRow = {
   sourceCategoryKey: string;
   finishTimeRaw: string;
   totalTimeMs: number;
-  totalTimeDisplay: string; // "DNF"/"DSQ"/formatted
+  totalTimeDisplay: string;
   epc: string;
 };
 

@@ -1,6 +1,3 @@
-// src/lib/csvParse.ts
-// Robust-enough CSV parser for typical timing exports (supports quotes & commas).
-
 function stripBom(s: string) {
   if (!s) return s;
   return s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s;
@@ -24,7 +21,6 @@ export function parseCsv(text: string): string[][] {
   const input = stripBom(String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n"));
   const lines = input.split("\n");
 
-  // Find a non-empty sample line to detect delimiter
   const sample = lines.find((l) => l.trim().length > 0) || "";
   const delimiter = detectDelimiter(sample);
 
@@ -66,7 +62,6 @@ export function parseCsv(text: string): string[][] {
       row.push(field.trim());
       field = "";
 
-      // ignore fully empty lines
       const isEmpty = row.every((c) => !String(c || "").trim());
       if (!isEmpty) rows.push(row);
       row = [];
@@ -76,7 +71,6 @@ export function parseCsv(text: string): string[][] {
     field += ch;
   }
 
-  // last field
   if (field.length > 0 || row.length > 0) {
     row.push(field.trim());
     const isEmpty = row.every((c) => !String(c || "").trim());

@@ -10,10 +10,6 @@ export default async function handler(
   }
 
   try {
-    const { eventId } = req.query;
-
-    const event = (eventId && typeof eventId === 'string') ? eventId : 'default';
-
     const token = (process as any).env?.BLOB_READ_WRITE_TOKEN;
     if (!token) {
       return res.status(500).json({
@@ -22,7 +18,6 @@ export default async function handler(
     }
 
     const { blobs } = await list({
-      prefix: `${event}/`,
       token,
     });
 
@@ -31,19 +26,18 @@ export default async function handler(
 
     for (const kind of csvKinds) {
       const kindBlobs = blobs
-        .filter((b) => b.pathname.startsWith(`${event}/${kind}-`))
+        .filter((b) => b.pathname.startsWith(`${kind}-`))
         .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
 
       if (kindBlobs.length > 0) {
         const latest = kindBlobs[0];
-        // Try to extract row count from filename or fetch and count
         const response = await fetch(latest.url);
         const text = await response.text();
-        const rows = text.split('\n').filter((line) => line.trim().length > 0).length - 1; // minus header
+        const rows = text.split('\n').filter((line) => line.trim().length > 0).length - 1;
 
         meta.push({
           key: kind,
-          filename: latest.pathname.replace(`${event}/${kind}-`, '').replace(/^\d+-/, ''),
+          filename: latest.pathname.replace(`${kind}-`, '').replace(/^\d+-/, ''),
           updatedAt: new Date(latest.uploadedAt).getTime(),
           rows: Math.max(0, rows),
         });
@@ -58,4 +52,3 @@ export default async function handler(
     });
   }
 }
-

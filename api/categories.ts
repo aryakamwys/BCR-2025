@@ -1,127 +1,163 @@
-// api/categories.ts
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { put } from '@vercel/blob';
+import prisma from '../src/lib/prisma';
 
-export interface EventCategories {
-  eventId: string;
-  categories: string[];
-  updatedAt: number;
+interface APIEvent {
+  httpMethod: string;
+  headers: { [key: string]: string };
+  queryStringParameters?: { [key: string]: string };
+  body: string | null;
+  isBase64Encoded: boolean;
 }
 
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-) {
-  const corsHeaders = {
+interface APIResponse {
+  statusCode: number;
+  headers: { [key: string]: string };
+  body: string;
+}
+
+const DEFAULT_CATEGORIES = [
+  '10K Laki-laki',
+  '10K Perempuan',
+  '5K Laki-Laki',
+  '5K Perempuan',
+];
+
+export default async function handler(event: APIEvent): Promise<APIResponse> {
+  const headers = {
+    'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).setHeaders(corsHeaders).end();
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: '',
+    };
   }
 
   try {
-    const { eventId } = req.query;
+    const eventId = event.queryStringParameters?.eventId;
 
-    if (!eventId || typeof eventId !== 'string') {
-      return res.status(400).json({ error: 'eventId is required' });
+    if (!eventId) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'eventId is required' }),
+      };
     }
 
-    if (req.method === 'GET') {
-      const categories = await loadCategories(eventId);
-      return res.status(200).setHeaders(corsHeaders).json(categories);
+    if (event.httpMethod === 'GET') {
+      const categories = await prisma.category.findMany({
+        where: { eventId },
+        orderBy: { order: 'asc' },
+      });
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          categories: categories.map((c) => c.name),
+        }),
+      };
     }
 
-    if (req.method === 'POST' || req.method === 'PUT') {
-      const { categories } = req.body;
+    if (event.httpMethod === 'POST' || event.httpMethod === 'PUT') {
+      if (!event.body) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Missing request body' }),
+        };
+      }
+
+      const body = event.isBase64Encoded
+        ? JSON.parse(Buffer.from(event.body, 'base64').toString())
+        : JSON.parse(event.body);
+
+      const { categories } = body;
 
       if (!Array.isArray(categories)) {
-        return res.status(400).json({ error: 'categories must be an array' });
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'categories must be an array' }),
+        };
       }
 
       if (categories.length === 0) {
-        return res.status(400).json({ error: 'At least one category is required' });
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'At least one category is required' }),
+        };
       }
 
-      const data: EventCategories = {
-        eventId,
-        categories,
-        updatedAt: Date.now(),
+      await prisma.category.deleteMany({
+        where: { eventId },
+      });
+
+      await prisma.category.createMany({
+        data: categories.map((name: string, order: number) => ({
+          eventId,
+          name,
+          order,
+        })),
+      });
+
+      const updated = await prisma.category.findMany({
+        where: { eventId },
+        orderBy: { order: 'asc' },
+      });
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          categories: updated.map((c) => c.name),
+        }),
       };
-
-      await saveCategories(data);
-
-      return res.status(200).setHeaders(corsHeaders).json(data);
     }
 
-    if (req.method === 'DELETE') {
-      const defaultCategories = [
-        '10K Laki-laki',
-        '10K Perempuan',
-        '5K Laki-Laki',
-        '5K Perempuan',
-      ];
+    if (event.httpMethod === 'DELETE') {
+      await prisma.category.deleteMany({
+        where: { eventId },
+      });
 
-      const data: EventCategories = {
-        eventId,
-        categories: defaultCategories,
-        updatedAt: Date.now(),
+      await prisma.category.createMany({
+        data: DEFAULT_CATEGORIES.map((name, order) => ({
+          eventId,
+          name,
+          order,
+        })),
+      });
+
+      const categories = await prisma.category.findMany({
+        where: { eventId },
+        orderBy: { order: 'asc' },
+      });
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          categories: categories.map((c) => c.name),
+        }),
       };
-
-      await saveCategories(data);
-
-      return res.status(200).setHeaders(corsHeaders).json(data);
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'Method not allowed' }),
+    };
   } catch (error: any) {
     console.error('Categories API error:', error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
-  }
-}
-
-async function loadCategories(eventId: string): Promise<string[]> {
-  try {
-    const fileName = `categories-${eventId}.json`;
-    const response = await fetch(
-      `https://rdr.la/${process.env.BLOB_READ_WRITE_TOKEN}/${fileName}`
-    );
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        return [
-          '10K Laki-laki',
-          '10K Perempuan',
-          '5K Laki-Laki',
-          '5K Perempuan',
-        ];
-      }
-      throw new Error(`Failed to load categories: ${response.statusText}`);
-    }
-
-    const data: EventCategories = await response.json();
-    return data.categories || [];
-  } catch (error) {
-    console.error('Error loading categories:', error);
-    return [
-      '10K Laki-laki',
-      '10K Perempuan',
-      '5K Laki-Laki',
-      '5K Perempuan',
-    ];
-  }
-}
-
-async function saveCategories(data: EventCategories): Promise<void> {
-  try {
-    const fileName = `categories-${data.eventId}.json`;
-    await put(fileName, JSON.stringify(data), {
-      access: 'public',
-    });
-  } catch (error) {
-    console.error('Error saving categories:', error);
-    throw error;
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: error.message || 'Internal server error' }),
+    };
   }
 }

@@ -10,10 +10,6 @@ export default async function handler(
   }
 
   try {
-    const { eventId } = req.query;
-
-    const event = (eventId && typeof eventId === 'string') ? eventId : 'default';
-
     const protocol = req.headers['x-forwarded-proto'] || 'https';
     const host = req.headers.host || '';
     const url = `${protocol}://${host}${req.url || '/api/upload-csv'}`;
@@ -69,7 +65,6 @@ export default async function handler(
           addRandomSuffix: true,
           tokenPayload: JSON.stringify({
             kind,
-            eventId: event, // Add eventId to token payload
             uploadedAt: Date.now(),
           }),
         };
@@ -78,9 +73,9 @@ export default async function handler(
         console.log('CSV upload completed', blob.url, tokenPayload);
 
         try {
-          const { kind, eventId } = JSON.parse(tokenPayload || '{}');
+          const { kind } = JSON.parse(tokenPayload || '{}');
 
-          console.log(`CSV ${kind} uploaded successfully for event ${eventId}:`, blob.url);
+          console.log(`CSV ${kind} uploaded successfully:`, blob.url);
         } catch (error) {
           console.error('Error processing upload completion:', error);
         }

@@ -1,8 +1,18 @@
-// api/events.ts
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { put, list, del } from '@vercel/blob';
+import prisma from '../src/lib/prisma';
 
-const EVENTS_FILE = 'events.json';
+interface APIEvent {
+  httpMethod: string;
+  headers: { [key: string]: string };
+  queryStringParameters?: { [key: string]: string };
+  body: string | null;
+  isBase64Encoded: boolean;
+}
+
+interface APIResponse {
+  statusCode: number;
+  headers: { [key: string]: string };
+  body: string;
+}
 
 export interface Event {
   id: string;
@@ -14,53 +24,124 @@ export interface Event {
   isActive: boolean;
   createdAt: number;
   categories: string[];
-  participantCount?: number;
 }
 
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-) {
-  const corsHeaders = {
+function formatEvent(event: any): Event {
+  return {
+    id: event.id,
+    name: event.name,
+    slug: event.slug,
+    description: event.description || '',
+    eventDate: event.eventDate.toISOString(),
+    location: event.location || '',
+    isActive: event.isActive,
+    categories: event.categories.map((c: any) => c.name),
+    createdAt: event.createdAt.getTime(),
+  };
+}
+
+export default async function handler(event: APIEvent): Promise<APIResponse> {
+  const headers = {
+    'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).setHeaders(corsHeaders).end();
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: '',
+    };
   }
 
   try {
-    if (req.method === 'GET') {
-      const { eventId } = req.query;
+    if (event.httpMethod === 'GET') {
+      const eventId = event.queryStringParameters?.eventId;
 
-      if (eventId && typeof eventId === 'string') {
-        const events = await loadEvents();
-        const event = events.find((e) => e.id === eventId || e.slug === eventId);
+      if (eventId) {
+        const eventRecord = await prisma.event.findUnique({
+          where: { id: eventId },
+          include: {
+            categories: {
+              orderBy: { order: 'asc' },
+            },
+          },
+        });
 
-        if (!event) {
-          return res.status(404).json({ error: 'Event not found' });
+        if (!eventRecord) {
+          const eventBySlug = await prisma.event.findUnique({
+            where: { slug: eventId },
+            include: {
+              categories: {
+                orderBy: { order: 'asc' },
+              },
+            },
+          });
+
+          if (!eventBySlug) {
+            return {
+              statusCode: 404,
+              headers,
+              body: JSON.stringify({ error: 'Event not found' }),
+            };
+          }
+
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify(formatEvent(eventBySlug)),
+          };
         }
 
-        return res.status(200).setHeaders(corsHeaders).json(event);
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify(formatEvent(eventRecord)),
+        };
       } else {
-        const events = await loadEvents();
-        return res.status(200).setHeaders(corsHeaders).json(events);
+        const events = await prisma.event.findMany({
+          include: {
+            categories: {
+              orderBy: { order: 'asc' },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify(events.map(formatEvent)),
+        };
       }
     }
 
-    if (req.method === 'POST') {
-      const eventData: Omit<Event, 'id' | 'slug' | 'createdAt'> = req.body;
-
-      if (!eventData.name || !eventData.eventDate) {
-        return res.status(400).json({ error: 'Name and eventDate are required' });
+    if (event.httpMethod === 'POST') {
+      if (!event.body) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Missing request body' }),
+        };
       }
 
-      const events = await loadEvents();
+      const body = event.isBase64Encoded
+        ? JSON.parse(Buffer.from(event.body, 'base64').toString())
+        : JSON.parse(event.body);
 
-      // Generate slug from name
-      const baseSlug = eventData.name
+      const { name, description, eventDate, location, isActive, categories } = body;
+
+      if (!name || !eventDate) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Name and eventDate are required' }),
+        };
+      }
+
+      const baseSlug = name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
@@ -68,141 +149,130 @@ export default async function handler(
       let slug = baseSlug;
       let counter = 1;
 
-      while (events.some((e) => e.slug === slug)) {
+      let existingEvent = await prisma.event.findUnique({
+        where: { slug },
+      });
+
+      while (existingEvent) {
         slug = `${baseSlug}-${counter}`;
         counter++;
+        existingEvent = await prisma.event.findUnique({
+          where: { slug },
+        });
       }
 
-      const newEvent: Event = {
-        id: `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        slug,
-        name: eventData.name,
-        description: eventData.description || '',
-        eventDate: eventData.eventDate,
-        location: eventData.location || '',
-        isActive: eventData.isActive ?? false,
-        categories: eventData.categories || [
-          '10K Laki-laki',
-          '10K Perempuan',
-          '5K Laki-Laki',
-          '5K Perempuan',
-        ],
-        participantCount: 0,
-        createdAt: Date.now(),
+      const defaultCategories = categories || ['10K Laki-laki', '10K Perempuan', '5K Laki-Laki', '5K Perempuan'];
+
+      const newEvent = await prisma.event.create({
+        data: {
+          name,
+          slug,
+          description,
+          eventDate: new Date(eventDate),
+          location,
+          isActive: isActive !== undefined ? isActive : true,
+          categories: {
+            create: defaultCategories.map((name: string, order: number) => ({
+              name,
+              order,
+            })),
+          },
+        },
+        include: {
+          categories: {
+            orderBy: { order: 'asc' },
+          },
+        },
+      });
+
+      return {
+        statusCode: 201,
+        headers,
+        body: JSON.stringify(formatEvent(newEvent)),
       };
-
-      events.push(newEvent);
-      await saveEvents(events);
-
-      await saveCategories(newEvent.id, newEvent.categories);
-
-      return res.status(201).setHeaders(corsHeaders).json(newEvent);
     }
 
-    if (req.method === 'PUT') {
-      const { eventId } = req.query;
-      const updates: Partial<Event> = req.body;
+    if (event.httpMethod === 'PUT') {
+      const eventId = event.queryStringParameters?.eventId;
 
-      if (!eventId || typeof eventId !== 'string') {
-        return res.status(400).json({ error: 'eventId is required' });
+      if (!eventId) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'eventId is required' }),
+        };
       }
 
-      const events = await loadEvents();
-      const eventIndex = events.findIndex((e) => e.id === eventId);
-
-      if (eventIndex === -1) {
-        return res.status(404).json({ error: 'Event not found' });
+      if (!event.body) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'Missing request body' }),
+        };
       }
 
-      events[eventIndex] = {
-        ...events[eventIndex],
-        ...updates,
-        id: events[eventIndex].id, // Preserve ID
-        slug: updates.slug || events[eventIndex].slug, // Preserve slug if not provided
+      const body = event.isBase64Encoded
+        ? JSON.parse(Buffer.from(event.body, 'base64').toString())
+        : JSON.parse(event.body);
+
+      const { name, description, eventDate, location, isActive } = body;
+
+      const updatedEvent = await prisma.event.update({
+        where: { id: eventId },
+        data: {
+          ...(name && { name }),
+          ...(description !== undefined && { description }),
+          ...(eventDate && { eventDate: new Date(eventDate) }),
+          ...(location !== undefined && { location }),
+          ...(isActive !== undefined && { isActive }),
+        },
+        include: {
+          categories: {
+            orderBy: { order: 'asc' },
+          },
+        },
+      });
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify(formatEvent(updatedEvent)),
       };
-
-      await saveEvents(events);
-
-      return res.status(200).setHeaders(corsHeaders).json(events[eventIndex]);
     }
 
-    // DELETE - Delete event
-    if (req.method === 'DELETE') {
-      const { eventId } = req.query;
+    if (event.httpMethod === 'DELETE') {
+      const eventId = event.queryStringParameters?.eventId;
 
-      if (!eventId || typeof eventId !== 'string') {
-        return res.status(400).json({ error: 'eventId is required' });
+      if (!eventId) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: 'eventId is required' }),
+        };
       }
 
-      const events = await loadEvents();
-      const eventIndex = events.findIndex((e) => e.id === eventId);
+      await prisma.event.delete({
+        where: { id: eventId },
+      });
 
-      if (eventIndex === -1) {
-        return res.status(404).json({ error: 'Event not found' });
-      }
-
-      // Remove event
-      events.splice(eventIndex, 1);
-      await saveEvents(events);
-
-      try {
-        const { blobs } = await list({ prefix: `${eventId}/` });
-        await Promise.all(blobs.map((blob) => del(blob.url)));
-      } catch (error) {
-        console.error('Error deleting event files:', error);
-      }
-
-      return res.status(200).setHeaders(corsHeaders).json({ success: true });
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true }),
+      };
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'Method not allowed' }),
+    };
   } catch (error: any) {
     console.error('Events API error:', error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
-  }
-}
-
-async function loadEvents(): Promise<Event[]> {
-  try {
-    const response = await fetch(
-      `https://rdr.la/${process.env.BLOB_READ_WRITE_TOKEN}/${EVENTS_FILE}`
-    );
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        return []; // No events yet
-      }
-      throw new Error(`Failed to load events: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.events || [];
-  } catch (error) {
-    console.error('Error loading events:', error);
-    return [];
-  }
-}
-
-async function saveEvents(events: Event[]): Promise<void> {
-  try {
-    await put(EVENTS_FILE, JSON.stringify({ events, updatedAt: Date.now() }), {
-      access: 'public',
-    });
-  } catch (error) {
-    console.error('Error saving events:', error);
-    throw error;
-  }
-}
-
-async function saveCategories(eventId: string, categories: string[]): Promise<void> {
-  try {
-    await put(
-      `categories-${eventId}.json`,
-      JSON.stringify({ eventId, categories, updatedAt: Date.now() }),
-      { access: 'public' }
-    );
-  } catch (error) {
-    console.error('Error saving categories:', error);
-    throw error;
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: error.message || 'Internal server error' }),
+    };
   }
 }

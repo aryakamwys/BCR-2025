@@ -1,23 +1,19 @@
-// src/App.tsx
+// src/pages/EventPage.tsx
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
-import RaceClock from "./components/RaceClock";
-import CategorySection from "./components/CategorySection";
-import LeaderboardTable, { LeaderRow } from "./components/LeaderboardTable";
-import ParticipantModal from "./components/ParticipantModal";
-import AdminPage from "./components/AdminPage";
-import HomePage from "./pages/HomePage";
-import EventPage from "./pages/EventPage";
-import CreateEventPage from "./pages/CreateEventPage";
-import { EventProvider, useEvent } from "./contexts/EventContext";
+import { useParams, Link } from "react-router-dom";
+import RaceClock from "../components/RaceClock";
+import CategorySection from "../components/CategorySection";
+import LeaderboardTable, { LeaderRow } from "../components/LeaderboardTable";
+import ParticipantModal from "../components/ParticipantModal";
+import AdminPage from "../components/AdminPage";
 import {
   loadMasterParticipants,
   loadTimesMap,
   loadCheckpointTimesMap,
-} from "./lib/data";
-import { CATEGORY_KEYS, DEFAULT_EVENT_TITLE, LS_EVENT_TITLE, LS_DATA_VERSION } from "./lib/config";
-import parseTimeToMs, { extractTimeOfDay, formatDuration } from "./lib/time";
+} from "../lib/data";
+import { DEFAULT_EVENT_TITLE, LS_EVENT_TITLE, LS_DATA_VERSION, getCategoriesForEvent } from "../lib/config";
+import parseTimeToMs, { extractTimeOfDay, formatDuration } from "../lib/time";
 
 const LS_CUTOFF = "imr_cutoff_ms";
 const LS_DQ = "imr_dq_map";
@@ -56,9 +52,11 @@ type LoadState =
   | { status: "error"; msg: string }
   | { status: "ready" };
 
-// Original Leaderboard App Component
-function LeaderboardApp() {
-  const { currentEvent, events, setCurrentEvent } = useEvent();
+export default function EventPage() {
+  const { slug } = useParams<{ slug: string }>();
+  const [eventId, setEventId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+
   const [eventTitle, setEventTitle] = useState<string>(() => {
     return localStorage.getItem(LS_EVENT_TITLE) || DEFAULT_EVENT_TITLE;
   });
@@ -81,8 +79,38 @@ function LeaderboardApp() {
   const [modalOpen, setModalOpen] = useState(false);
 
   const [recalcTick, setRecalcTick] = useState(0);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  // Load event info and categories
+  useEffect(() => {
+    if (!slug) return;
+
+    (async () => {
+      try {
+        // Load events to find matching event ID
+        const response = await fetch('/api/events');
+        if (response.ok) {
+          const events = await response.json();
+          const event = events.find((e: any) => e.slug === slug);
+          if (event) {
+            setEventId(event.id);
+            setEventTitle(event.name);
+            setCategories(event.categories || []);
+            setSettingsLoaded(true);
+          }
+        }
+      } catch (error) {
+        setSettingsLoaded(true);
+      }
+    })();
+  }, [slug]);
 
   useEffect(() => {
+    setSettingsLoaded(true);
+  }, [eventId]);
+
+  useEffect(() => {
+    if (!settingsLoaded || !eventId) return;
 
     (async () => {
       try {
@@ -93,7 +121,7 @@ function LeaderboardApp() {
           });
         }
 
-        const master = await loadMasterParticipants(currentEvent?.id || 'default');
+        const master = await loadMasterParticipants(eventId);
 
         if (!hasLoadedOnce) {
           setState({
@@ -102,9 +130,9 @@ function LeaderboardApp() {
           });
         }
 
-        const startMap = await loadTimesMap("start", currentEvent?.id || 'default');
-        const finishMap = await loadTimesMap("finish", currentEvent?.id || 'default');
-        const cpMap = await loadCheckpointTimesMap(currentEvent?.id || 'default');
+        const startMap = await loadTimesMap("start", eventId);
+        const finishMap = await loadTimesMap("finish", eventId);
+        const cpMap = await loadCheckpointTimesMap(eventId);
         setCheckpointMap(cpMap);
 
         const cutoffMs = loadCutoffMs();
@@ -251,7 +279,7 @@ function LeaderboardApp() {
         });
 
         const categoryRankByEpc = new Map<string, number>();
-        CATEGORY_KEYS.forEach((catKey) => {
+        categories.forEach((catKey) => {
           const list = finisherSorted.filter((r) => r.sourceCategoryKey === catKey);
           list.forEach((r, i) => categoryRankByEpc.set(r.epc, i + 1));
         });
@@ -268,7 +296,7 @@ function LeaderboardApp() {
         ];
 
         const catMap: Record<string, LeaderRow[]> = {};
-        CATEGORY_KEYS.forEach((catKey) => {
+        categories.forEach((catKey) => {
           const list = overallFinal.filter((r) => r.sourceCategoryKey === catKey);
           catMap[catKey] = list;
         });
@@ -276,7 +304,7 @@ function LeaderboardApp() {
         setOverall(overallFinal);
         setByCategory(catMap);
 
-        (LeaderboardApp as any)._rankMaps = {
+        (EventPage as any)._rankMaps = {
           finisherRankByEpc,
           genderRankByEpc,
           categoryRankByEpc,
@@ -299,7 +327,7 @@ function LeaderboardApp() {
         }
       }
     })();
-  }, [recalcTick, hasLoadedOnce, currentEvent]);
+  }, [recalcTick, hasLoadedOnce, settingsLoaded, eventId, categories]);
 
   // 🔁 Refresh when Admin uploads CSV / changes title (cross-tab)
   useEffect(() => {
@@ -316,8 +344,8 @@ function LeaderboardApp() {
   }, []);
 
   const tabs = useMemo(
-    () => ["Overall", ...CATEGORY_KEYS, "Admin"],
-    []
+    () => ["Overall", ...categories, "Admin"],
+    [categories]
   );
 
   // ✅ Jika data belum pernah berhasil dimuat (belum upload CSV),
@@ -327,6 +355,7 @@ function LeaderboardApp() {
       setActiveTab("Admin");
     }
   }, [hasLoadedOnce, state.status]);
+
   const onSelectParticipant = (row: LeaderRow) => {
     setSelected(row);
     setModalOpen(true);
@@ -334,7 +363,7 @@ function LeaderboardApp() {
 
   const modalData = useMemo(() => {
     if (!selected) return null;
-    const maps = (LeaderboardApp as any)._rankMaps;
+    const maps = (EventPage as any)._rankMaps;
     const overallRank = maps?.finisherRankByEpc?.get(selected.epc) ?? null;
     const genderRank = maps?.genderRankByEpc?.get(selected.epc) ?? null;
     const categoryRank = maps?.categoryRankByEpc?.get(selected.epc) ?? null;
@@ -357,37 +386,12 @@ function LeaderboardApp() {
   // Admin harus tetap bisa diakses untuk upload CSV pertama kali.
   const needsFirstUpload = !hasLoadedOnce && (state.status === "loading" || state.status === "error");
 
-  // ✅ Setelah first load: UI selalu tampil, meskipun data lagi refresh di background
   return (
     <div className="page">
-      {/* Event Selector */}
-      {events.length > 0 && (
-        <div style={{ marginBottom: '10px', textAlign: 'center' }}>
-          <select
-            value={currentEvent?.id || ''}
-            onChange={(e) => {
-              const selected = events.find((ev: any) => ev.id === e.target.value);
-              if (selected) setCurrentEvent(selected);
-            }}
-            style={{
-              padding: '8px 12px',
-              fontSize: '14px',
-              borderRadius: '4px',
-              border: '1px solid #ddd',
-              maxWidth: '400px',
-              width: '100%'
-            }}
-          >
-            {events.map((ev: any) => (
-              <option key={ev.id} value={ev.id}>
-                {ev.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      <h1 className="app-title">{eventTitle}</h1>
+      <div className="event-header">
+        <Link to="/" className="back-link">← Back to Events</Link>
+        <h1 className="app-title">{eventTitle}</h1>
+      </div>
 
       <div className="tabs">
         {tabs.map((t) => (
@@ -461,9 +465,9 @@ function LeaderboardApp() {
 
       {activeTab === "Admin" && (
         <AdminPage
+          eventId={eventId || undefined}
           allRows={overall}
           onConfigChanged={() => setRecalcTick((t) => t + 1)}
-          eventId={currentEvent?.id || 'default'}
         />
       )}
 
@@ -472,20 +476,26 @@ function LeaderboardApp() {
         onClose={() => setModalOpen(false)}
         data={modalData}
       />
+
+      <style>{`
+        .event-header {
+          margin-bottom: 1rem;
+        }
+
+        .back-link {
+          display: inline-block;
+          color: #667eea;
+          text-decoration: none;
+          font-weight: 500;
+          margin-bottom: 0.5rem;
+          transition: color 0.2s;
+        }
+
+        .back-link:hover {
+          color: #5568d3;
+          text-decoration: underline;
+        }
+      `}</style>
     </div>
-  );
-}
-
-export default function App() {
-  return (
-    <EventProvider>
-      <Routes>
-        <Route path="/" element={<LeaderboardApp />} />
-
-        <Route path="/admin/home" element={<HomePage />} />
-        <Route path="/admin/create-event" element={<CreateEventPage />} />
-        <Route path="/event/:slug" element={<EventPage />} />
-      </Routes>
-    </EventProvider>
   );
 }

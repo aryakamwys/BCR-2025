@@ -1,6 +1,3 @@
-// src/lib/time.ts
-
-// Parser utama untuk semua waktu (start/finish/override)
 export default function parseTimeToMs(raw: string): {
   ms: number | null;
   raw: string;
@@ -8,7 +5,6 @@ export default function parseTimeToMs(raw: string): {
   if (!raw) return { ms: null, raw };
   const str = raw.trim();
 
-  // 1️⃣ Full datetime format: 2025-11-23 07:00:00.000 atau 2025-11-23T07:00:00
   const dtMatch = str.match(
     /(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?/
   );
@@ -27,7 +23,6 @@ export default function parseTimeToMs(raw: string): {
     return { ms: date.getTime(), raw };
   }
 
-  // 2️⃣ Time of day: HH:mm:ss(.SSS)
   const tMatch = str.match(/(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?/);
   if (tMatch) {
     const [, h, m, s, msStr] = tMatch;
@@ -37,7 +32,6 @@ export default function parseTimeToMs(raw: string): {
     return { ms: now.getTime(), raw };
   }
 
-  // 3️⃣ Hour-minute: HH:mm
   const hm = str.match(/(\d{1,2}):(\d{2})/);
   if (hm) {
     const [, h, m] = hm;
@@ -46,7 +40,6 @@ export default function parseTimeToMs(raw: string): {
     return { ms: now.getTime(), raw };
   }
 
-  // 4️⃣ Hour only: "7"
   if (/^\d{1,2}$/.test(str)) {
     const h = Number(str);
     const now = new Date();
@@ -54,17 +47,12 @@ export default function parseTimeToMs(raw: string): {
     return { ms: now.getTime(), raw };
   }
 
-  // 5️⃣ Fallback: Date.parse (handle 2025-11-23 07:00:00)
   const parsed = Date.parse(str.replace(" ", "T"));
   if (!Number.isNaN(parsed)) return { ms: parsed, raw };
 
   return { ms: null, raw };
 }
 
-/**
- * Ambil hanya HH:MM:SS.mmm dari string datetime/timestamp
- * "2025-11-23 08:28:28.915" → "08:28:28.915"
- */
 export function extractTimeOfDay(raw: string): string {
   if (!raw) return "-";
   const m = raw.match(/(\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)/);
@@ -81,9 +69,6 @@ export function extractTimeOfDay(raw: string): string {
   return raw;
 }
 
-/**
- * Format durasi ms → HH:MM:SS (dipakai untuk Total Time)
- */
 export function formatDuration(ms: number | null): string {
   if (ms == null || !Number.isFinite(ms) || ms < 0) return "-";
   const total = Math.floor(ms / 1000);

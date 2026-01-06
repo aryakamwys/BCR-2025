@@ -10,16 +10,13 @@ export default async function handler(
   }
 
   try {
-    const { kind, eventId } = req.query;
+    const { kind } = req.query;
 
     if (!kind || typeof kind !== 'string') {
       return res.status(400).json({
         error: 'Parameter kind tidak ditemukan',
       });
     }
-
-    // Get eventId from query, default to 'default' for backward compatibility
-    const event = (eventId && typeof eventId === 'string') ? eventId : 'default';
 
     const token = (process as any).env?.BLOB_READ_WRITE_TOKEN;
     if (!token) {
@@ -29,7 +26,7 @@ export default async function handler(
     }
 
     const { blobs } = await list({
-      prefix: `${event}/${kind}-`,
+      prefix: `${kind}-`,
       token,
     });
 
@@ -45,4 +42,3 @@ export default async function handler(
     });
   }
 }
-

@@ -1,9 +1,6 @@
-// src/lib/data.ts
-
 import parseTimeToMs from "./time";
 import { parseCsv } from "./csvParse";
 import { getCsvFile } from "./idb";
-import { getCsvFromBlob } from "./vercelBlob";
 import { CATEGORY_KEYS, type CategoryKey } from "./config";
 
 const headerAliases: Record<string, string[]> = {
@@ -80,11 +77,7 @@ export type MasterParticipant = {
 };
 
 async function requireCsvText(kind: "master" | "finish",eventId: string = 'default'): Promise<string> {
-  // Try Vercel Blob first, fallback to IndexedDB
-  let file = await getCsvFromBlob(kind, eventId);
-  if (!file) {
-    file = await getCsvFile(kind, eventId);
-  }
+  const file = await getCsvFile(kind, eventId);
 
   if (!file?.text) {
     throw new Error(
@@ -95,11 +88,7 @@ async function requireCsvText(kind: "master" | "finish",eventId: string = 'defau
 }
 
 async function getCsvTextOptional(kind: "start" | "checkpoint",eventId: string = 'default'): Promise<string | null> {
-  // Try Vercel Blob first, fallback to IndexedDB
-  let file = await getCsvFromBlob(kind, eventId);
-  if (!file) {
-    file = await getCsvFile(kind, eventId);
-  }
+  const file = await getCsvFile(kind, eventId);
   return file?.text || null;
 }
 
@@ -150,7 +139,6 @@ export async function loadMasterParticipants(
       sourceCategoryKey: catKey,
     };
 
-    // prefer latest row if duplicate EPC
     byEpc.set(epc, p);
   });
 
@@ -171,7 +159,6 @@ export async function loadTimesMap(kind: "start" | "finish",eventId: string = 'd
       ? await requireCsvText("finish", eventId)
       : await getCsvTextOptional("start", eventId);
   if (!text) {
-    // START is optional (can be handled via Category Start Times in Admin)
     return new Map();
   }
   const grid = parseCsv(text);
@@ -206,7 +193,6 @@ export async function loadTimesMap(kind: "start" | "finish",eventId: string = 'd
     const newMs = entry.ms ?? null;
     const oldMs = existing.ms ?? null;
 
-    // ✅ FINISH: take the latest scan (largest ms)
     if (kind === "finish") {
       if (newMs != null && (oldMs == null || newMs > oldMs)) {
         map.set(epc, entry);
@@ -214,7 +200,6 @@ export async function loadTimesMap(kind: "start" | "finish",eventId: string = 'd
       return;
     }
 
-    // ✅ START: take the earliest scan (smallest ms)
     if (kind === "start") {
       if (newMs != null && (oldMs == null || newMs < oldMs)) {
         map.set(epc, entry);
@@ -227,12 +212,7 @@ export async function loadTimesMap(kind: "start" | "finish",eventId: string = 'd
 }
 
 export async function loadCheckpointTimesMap(eventId: string = 'default'): Promise<Map<string, string[]>> {
-  // checkpoint is optional
-  // Try Vercel Blob first, fallback to IndexedDB
-  let file = await getCsvFromBlob("checkpoint", eventId);
-  if (!file) {
-    file = await getCsvFile("checkpoint", eventId);
-  }
+  const file = await getCsvFile("checkpoint", eventId);
   if (!file?.text) return new Map();
 
   const grid = parseCsv(file.text);

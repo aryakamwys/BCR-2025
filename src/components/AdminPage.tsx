@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { LeaderRow } from "./LeaderboardTable";
-import { CATEGORY_KEYS, DEFAULT_EVENT_TITLE, LS_DATA_VERSION, LS_EVENT_TITLE, type CsvKind } from "../lib/config";
+import { CATEGORY_KEYS, DEFAULT_EVENT_TITLE, LS_DATA_VERSION, LS_EVENT_TITLE, type CsvKind, getCategoriesForEvent } from "../lib/config";
 import { putCsvFile, deleteCsvFile, listCsvMeta } from "../lib/idb";
-import { uploadCsvToBlob, deleteCsvFromBlob, listCsvMetaFromBlob, getSettingsFromBlob, saveSettingsToBlob, type AppSettings } from "../lib/vercelBlob";
 import { parseCsv, countDataRows } from "../lib/csvParse";
+import CategoryManager from "./CategoryManager";
+import { uploadBannerViaApi } from "../lib/storage";
+import { useEvent } from "../contexts/EventContext";
 
 const ADMIN_USER = "izbat@izbat.org";
 const ADMIN_PASS = "12345678";
@@ -11,7 +13,7 @@ const ADMIN_PASS = "12345678";
 const LS_AUTH = "imr_admin_authed";
 const LS_CUTOFF = "imr_cutoff_ms";
 const LS_DQ = "imr_dq_map";
-const LS_CAT_START = "imr_cat_start_raw"; // 🔹 start time per kategori (raw string)
+const LS_CAT_START = "imr_cat_start_raw";
 
 function loadAuth() {
   return localStorage.getItem(LS_AUTH) === "true";
@@ -69,10 +71,13 @@ function formatNowAsTimestamp(): string {
 export default function AdminPage({
   allRows,
   onConfigChanged,
+  eventId,
 }: {
   allRows: LeaderRow[];
   onConfigChanged: () => void;
+  eventId?: string;
 }) {
+  const { refreshEvents } = useEvent();
   const [authed, setAuthed] = useState(loadAuth());
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
@@ -93,6 +98,24 @@ export default function AdminPage({
     localStorage.getItem(LS_EVENT_TITLE) || DEFAULT_EVENT_TITLE
   );
 
+  const [categories, setCategories] = useState<string[]>([...CATEGORY_KEYS]);
+
+  // Event management state
+  const [events, setEvents] = useState<any[]>([]);
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [newEventName, setNewEventName] = useState('');
+  const [newEventDate, setNewEventDate] = useState('');
+  const [newEventLocation, setNewEventLocation] = useState('');
+  const [newEventDescription, setNewEventDescription] = useState('');
+  const [newEventActive, setNewEventActive] = useState(true);
+
+  // Banner management state
+  const [banners, setBanners] = useState<any[]>([]);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerAlt, setBannerAlt] = useState('');
+  const [bannerOrder, setBannerOrder] = useState(0);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+
   const [csvMeta, setCsvMeta] = useState<
     Array<{ key: CsvKind; filename: string; updatedAt: number; rows: number }>
   >([]);
@@ -104,74 +127,27 @@ export default function AdminPage({
   useEffect(() => {
     (async () => {
       try {
-        try {
-          const meta = await listCsvMetaFromBlob();
-          setCsvMeta(meta as any);
-        } catch {
-          const meta = await listCsvMeta();
-          setCsvMeta(meta as any);
-        }
+        const meta = await listCsvMeta(eventId);
+        setCsvMeta(meta as any);
       } catch {
       }
-      
-      if (!import.meta.env.DEV) {
+
+      // Load categories for this event
+      if (eventId) {
         try {
-          const settings = await getSettingsFromBlob();
-          if (settings) {
-            if (settings.cutoffMs != null) {
-              setCutoffHours(String(settings.cutoffMs / 3600000));
-              saveCutoffMs(settings.cutoffMs);
-            }
-            if (settings.catStartMap && Object.keys(settings.catStartMap).length > 0) {
-              setCatStart(settings.catStartMap);
-              saveCatStartMap(settings.catStartMap);
-            }
-            if (settings.eventTitle) {
-              setEventTitle(settings.eventTitle);
-              localStorage.setItem(LS_EVENT_TITLE, settings.eventTitle);
-            }
-            if (settings.dqMap && Object.keys(settings.dqMap).length > 0) {
-              setDqMap(settings.dqMap);
-              saveDQMap(settings.dqMap);
-            }
-          }
+          const cats = await getCategoriesForEvent(eventId);
+          setCategories(cats);
         } catch (error) {
-          console.error('Gagal memuat settings dari Blob:', error);
         }
       }
     })();
-  }, [authed]);
+  }, [authed, eventId]);
 
   const refreshCsvMeta = async () => {
     try {
-      try {
-        const meta = await listCsvMetaFromBlob();
-        setCsvMeta(meta as any);
-      } catch {
-        const meta = await listCsvMeta();
-        setCsvMeta(meta as any);
-      }
+      const meta = await listCsvMeta(eventId);
+      setCsvMeta(meta as any);
     } catch (error) {
-      console.error('Error refreshing CSV meta:', error);
-    }
-  };
-
-  const saveAllSettingsToBlob = async (overrides: Partial<AppSettings> = {}) => {
-    if (import.meta.env.DEV) return;
-    
-    const ms = loadCutoffMs();
-    const currentDqMap = loadDQMap();
-    const settings: AppSettings = {
-      cutoffMs: overrides.cutoffMs !== undefined ? overrides.cutoffMs : ms,
-      catStartMap: overrides.catStartMap !== undefined ? overrides.catStartMap : catStart,
-      eventTitle: overrides.eventTitle !== undefined ? overrides.eventTitle : eventTitle,
-      dqMap: overrides.dqMap !== undefined ? overrides.dqMap : currentDqMap,
-    };
-    
-    try {
-      await saveSettingsToBlob(settings);
-    } catch (error) {
-      console.error('Gagal menyimpan settings ke Blob:', error);
     }
   };
 
@@ -180,21 +156,20 @@ export default function AdminPage({
     localStorage.setItem(LS_EVENT_TITLE, t || DEFAULT_EVENT_TITLE);
     bumpDataVersion();
     onConfigChanged();
-    await saveAllSettingsToBlob({ eventTitle: t || DEFAULT_EVENT_TITLE });
     alert("Judul event berhasil diperbarui");
   };
 
   const uploadCsv = async (kind: CsvKind, file: File) => {
     const text = await file.text();
     const grid = parseCsv(text);
-    
+
     if (!grid || grid.length === 0) {
       alert(`CSV '${kind}': File kosong atau tidak valid.`);
       return;
     }
-    
+
     const headers = (grid[0] || []).map((x) => String(x || "").trim());
-    
+
     // Normalize headers untuk matching (sama seperti di data.ts)
     function norm(s: string) {
       return String(s || "")
@@ -203,7 +178,7 @@ export default function AdminPage({
         .replace(/\n/g, " ")
         .trim();
     }
-    
+
     const headersNorm = headers.map(norm);
 
     // Menggunakan headerAliases yang sama dengan data.ts
@@ -219,10 +194,10 @@ export default function AdminPage({
     // Validasi untuk Master CSV
     if (kind === "master") {
       const epcAliases = headerAliases.epc.map(norm);
-      const hasEpc = headersNorm.some((h) => 
+      const hasEpc = headersNorm.some((h) =>
         epcAliases.some((alias) => h === alias || h.includes(alias))
       );
-      
+
       if (!hasEpc) {
         const headerList = headers.length > 0 ? headers.join(", ") : "(tidak ada header)";
         alert(
@@ -245,14 +220,14 @@ export default function AdminPage({
     if (kind !== "master") {
       const epcAliases = headerAliases.epc.map(norm);
       const timesAliases = headerAliases.times.map(norm);
-      
-      const hasEpc = headersNorm.some((h) => 
+
+      const hasEpc = headersNorm.some((h) =>
         epcAliases.some((alias) => h === alias || h.includes(alias))
       );
-      const hasTimes = headersNorm.some((h) => 
+      const hasTimes = headersNorm.some((h) =>
         timesAliases.some((alias) => h === alias || h.includes(alias))
       );
-      
+
       if (!hasEpc) {
         const headerList = headers.length > 0 ? headers.join(", ") : "(tidak ada header)";
         alert(
@@ -264,7 +239,7 @@ export default function AdminPage({
         );
         return;
       }
-      
+
       if (!hasTimes) {
         const headerList = headers.length > 0 ? headers.join(", ") : "(tidak ada header)";
         alert(
@@ -279,23 +254,9 @@ export default function AdminPage({
     }
 
     const rows = countDataRows(grid);
-    const isDev = import.meta.env.DEV;
-    
-    if (isDev) {
-      await putCsvFile({ kind, text, filename: file.name, rows });
-    } else {
-      try {
-        const blob = await uploadCsvToBlob(kind, file);
-        console.log('File uploaded to Vercel Blob:', blob.url);
-        const response = await fetch(blob.url);
-        const uploadedText = await response.text();
-        await putCsvFile({ kind, text: uploadedText, filename: file.name, rows });
-      } catch (error: any) {
-        console.error('Upload to Vercel Blob failed, using IndexedDB only:', error);
-        await putCsvFile({ kind, text, filename: file.name, rows });
-      }
-    }
-    
+
+    await putCsvFile({ kind, text, filename: file.name, rows, eventId });
+
     bumpDataVersion();
     onConfigChanged();
     await refreshCsvMeta();
@@ -305,12 +266,7 @@ export default function AdminPage({
   const clearAllCsv = async () => {
     if (!confirm("Reset semua CSV yang sudah diupload?")) return;
     for (const k of ["master", "start", "finish", "checkpoint"] as CsvKind[]) {
-      try {
-        await deleteCsvFromBlob(k);
-      } catch (error) {
-        console.error(`Failed to delete ${k} from blob:`, error);
-      }
-      await deleteCsvFile(k);
+      await deleteCsvFile(k, eventId);
     }
     bumpDataVersion();
     onConfigChanged();
@@ -362,7 +318,6 @@ export default function AdminPage({
     }
 
     onConfigChanged();
-    await saveAllSettingsToBlob({ cutoffMs: ms });
     alert("Cut off time berhasil diperbarui");
   };
 
@@ -372,16 +327,167 @@ export default function AdminPage({
     setDqMap(next);
     saveDQMap(next);
     onConfigChanged();
-    await saveAllSettingsToBlob({ dqMap: next });
   };
 
   const applyCatStart = async () => {
     saveCatStartMap(catStart);
     onConfigChanged();
-    await saveAllSettingsToBlob({ catStartMap: catStart });
     alert(
       "Waktu start kategori berhasil diperbarui.\nTotal time akan menggunakan nilai ini per kategori."
     );
+  };
+
+  const loadEvents = async () => {
+    try {
+      const response = await fetch('/api/events');
+      if (response.ok) {
+        const data = await response.json();
+        setEvents(data);
+      }
+    } catch (error) {
+    }
+  };
+
+  const createEvent = async () => {
+    if (!newEventName.trim()) {
+      alert('Event name is required');
+      return;
+    }
+    if (!newEventDate) {
+      alert('Event date is required');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/events', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newEventName.trim(),
+          description: newEventDescription.trim(),
+          eventDate: newEventDate,
+          location: newEventLocation.trim(),
+          isActive: newEventActive,
+          categories: [...CATEGORY_KEYS],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to create event' }));
+        throw new Error(errorData.error || 'Failed to create event');
+      }
+
+      const event = await response.json();
+
+      // Reset form
+      setNewEventName('');
+      setNewEventDate('');
+      setNewEventLocation('');
+      setNewEventDescription('');
+      setNewEventActive(true);
+      setShowEventForm(false);
+
+      // Reload events list
+      await loadEvents();
+      await refreshEvents();
+
+      alert(`Event "${event.name}" created successfully!`);
+    } catch (err: any) {
+      alert(err.message || 'Failed to create event');
+    }
+  };
+
+  // Load events when authenticated
+  useEffect(() => {
+    if (authed) {
+      loadEvents();
+      loadBanners();
+    }
+  }, [authed, eventId]);
+
+  const loadBanners = async () => {
+    if (!eventId) return;
+    try {
+      const response = await fetch(`/api/banners?eventId=${eventId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setBanners(data);
+      }
+    } catch (error) {
+    }
+  };
+
+  const handleBannerUpload = async () => {
+    if (!bannerFile) {
+      alert('Please select an image file');
+      return;
+    }
+    if (!eventId) {
+      alert('Event ID is required');
+      return;
+    }
+
+    setUploadingBanner(true);
+
+    try {
+      const result = await uploadBannerViaApi(eventId, bannerFile);
+
+      setBannerFile(null);
+      setBannerAlt('');
+      setBannerOrder(0);
+      const fileInput = document.getElementById('banner-upload') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+
+      await loadBanners();
+
+      alert('Banner uploaded successfully!');
+    } catch (error: any) {
+      alert(error.message || 'Failed to upload banner');
+    } finally {
+      setUploadingBanner(false);
+    }
+  };
+
+  const toggleBannerActive = async (bannerId: string) => {
+    try {
+      const banner = banners.find((b: any) => b.id === bannerId);
+      if (!banner) return;
+
+      const response = await fetch('/api/update-banner', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          bannerId,
+          isActive: !banner.isActive,
+        }),
+      });
+
+      if (response.ok) {
+        await loadBanners();
+      }
+    } catch (error) {
+    }
+  };
+
+  const deleteBanner = async (bannerId: string, imageUrl: string) => {
+    if (!confirm('Are you sure you want to delete this banner?')) return;
+
+    try {
+      const response = await fetch(`/api/delete-banner?bannerId=${bannerId}&imageUrl=${encodeURIComponent(imageUrl)}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        await loadBanners();
+        alert('Banner deleted successfully!');
+      }
+    } catch (error) {
+      alert('Failed to delete banner');
+    }
   };
 
   if (!authed) {
@@ -437,6 +543,131 @@ export default function AdminPage({
               onChange={(e) => setEventTitle(e.target.value)}
             />
           </div>
+        </div>
+      </div>
+
+      {/* Manage Events - New Section */}
+      <div className="card">
+        <div className="header-row">
+          <div>
+            <h2 className="section-title">Manage Events</h2>
+            <div className="subtle">Create and manage multiple race events.</div>
+          </div>
+          <button className="btn" onClick={() => setShowEventForm(!showEventForm)}>
+            {showEventForm ? "Cancel" : "+ Create Event"}
+          </button>
+        </div>
+
+        {showEventForm && (
+          <div style={{ marginTop: "1rem", padding: "1rem", background: "#f9fafb", borderRadius: "8px" }}>
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>Event Name</label>
+              <input
+                className="search"
+                style={{ width: "100%" }}
+                placeholder="e.g., Jakarta Marathon 2025"
+                value={newEventName}
+                onChange={(e) => setNewEventName(e.target.value)}
+              />
+            </div>
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>Event Date</label>
+              <input
+                type="date"
+                className="search"
+                style={{ width: "100%" }}
+                value={newEventDate}
+                onChange={(e) => setNewEventDate(e.target.value)}
+              />
+            </div>
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>Location</label>
+              <input
+                className="search"
+                style={{ width: "100%" }}
+                placeholder="e.g., Jakarta, Indonesia"
+                value={newEventLocation}
+                onChange={(e) => setNewEventLocation(e.target.value)}
+              />
+            </div>
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>Description</label>
+              <textarea
+                className="search"
+                style={{ width: "100%", minHeight: "80px" }}
+                placeholder="Brief description of the event..."
+                value={newEventDescription}
+                onChange={(e) => setNewEventDescription(e.target.value)}
+              />
+            </div>
+            <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <input
+                  type="checkbox"
+                  checked={newEventActive}
+                  onChange={(e) => setNewEventActive(e.target.checked)}
+                />
+                <span>Event is active</span>
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <button className="btn" onClick={createEvent}>
+                Create Event
+              </button>
+              <button className="btn ghost" onClick={() => {
+                setShowEventForm(false);
+                setNewEventName("");
+                setNewEventDate("");
+                setNewEventLocation("");
+                setNewEventDescription("");
+                setNewEventActive(true);
+              }}>
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="table-wrap" style={{ marginTop: "1rem" }}>
+          <table className="f1-table compact">
+            <thead>
+              <tr>
+                <th>Event Name</th>
+                <th>Date</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="empty">No events created yet</td>
+                </tr>
+              ) : (
+                events.map((evt) => (
+                  <tr key={evt.id} className="row-hover">
+                    <td className="name-cell">{evt.name}</td>
+                    <td className="mono">{new Date(evt.eventDate).toLocaleDateString()}</td>
+                    <td>{evt.location || "-"}</td>
+                    <td>
+                      <span className={`badge ${evt.isActive ? 'badge-live' : 'badge-completed'}`}>
+                        {evt.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className="btn ghost"
+                        onClick={() => window.open(`/event/${evt.slug}`, '_blank')}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -513,6 +744,126 @@ export default function AdminPage({
         </div>
       </div>
 
+      {/* Banner Images */}
+      {eventId && (
+        <div className="card">
+          <div className="header-row">
+            <div>
+              <h2 className="section-title">Banner Images</h2>
+              <div className="subtle">
+                Upload banner images untuk event ini. Supported formats: JPG, PNG, GIF
+              </div>
+            </div>
+          </div>
+
+          <div className="table-wrap">
+            <table className="f1-table compact">
+              <thead>
+                <tr>
+                  <th style={{ width: 120 }}>Preview</th>
+                  <th>Image URL / Alt Text</th>
+                  <th style={{ width: 80 }}>Order</th>
+                  <th style={{ width: 100 }}>Status</th>
+                  <th style={{ width: 150 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {banners.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="empty">No banners uploaded yet</td>
+                  </tr>
+                ) : (
+                  banners
+                    .sort((a: any, b: any) => a.order - b.order)
+                    .map((banner: any) => (
+                      <tr key={banner.id} className="row-hover">
+                        <td>
+                          <img
+                            src={banner.imageUrl}
+                            alt={banner.alt || "Banner preview"}
+                            style={{ width: "100px", height: "60px", objectFit: "cover", borderRadius: "4px" }}
+                          />
+                        </td>
+                        <td>
+                          <div className="mono" style={{ fontSize: "11px", marginBottom: "4px" }}>
+                            {banner.imageUrl.slice(0, 50)}...
+                          </div>
+                          <div className="subtle">{banner.alt || "-"}</div>
+                        </td>
+                        <td className="mono">{banner.order}</td>
+                        <td>
+                          <span className={`badge ${banner.isActive ? 'badge-live' : 'badge-inactive'}`}>
+                            {banner.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: "0.5rem" }}>
+                            <button
+                              className="btn ghost"
+                              onClick={() => toggleBannerActive(banner.id)}
+                            >
+                              {banner.isActive ? "Hide" : "Show"}
+                            </button>
+                            <button
+                              className="btn ghost"
+                              onClick={() => deleteBanner(banner.id, banner.imageUrl)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid #e5e7eb" }}>
+            <div className="subtle" style={{ marginBottom: "0.75rem", fontWeight: 500 }}>Upload New Banner</div>
+            <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setBannerFile(e.target.files?.[0] || null)}
+                style={{ flex: 1, minWidth: "200px" }}
+              />
+              <input
+                className="search"
+                style={{ width: "300px" }}
+                placeholder="Alt text (optional)"
+                value={bannerAlt}
+                onChange={(e) => setBannerAlt(e.target.value)}
+              />
+              <input
+                type="number"
+                className="search"
+                style={{ width: "100px" }}
+                placeholder="Order"
+                value={bannerOrder}
+                onChange={(e) => setBannerOrder(Number(e.target.value))}
+              />
+              <button
+                className="btn"
+                onClick={handleBannerUpload}
+                disabled={!bannerFile || uploadingBanner}
+              >
+                {uploadingBanner ? "Uploading..." : "Upload"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category Management - Always show, use 'default' eventId if not provided */}
+      <CategoryManager
+        eventId={eventId || 'default'}
+        onCategoriesChange={(newCategories) => {
+          setCategories(newCategories);
+          onConfigChanged();
+        }}
+      />
+
       {/* Cut Off Time */}
       <div className="card">
         <div className="header-row">
@@ -570,7 +921,7 @@ export default function AdminPage({
               </tr>
             </thead>
             <tbody>
-              {CATEGORY_KEYS.map((catKey) => (
+              {categories.map((catKey) => (
                 <tr key={catKey} className="row-hover">
                   <td className="name-cell">{catKey}</td>
                   <td>

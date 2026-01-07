@@ -83,6 +83,7 @@ export default function CreateEventPage() {
 
       const event = await response.json();
 
+      alert(`Event "${event.name}" berhasil dibuat dengan ${event.categories.length} kategori!`);
       navigate(`/event/${event.slug}`);
     } catch (err: any) {
       setError(err.message || 'Failed to create event');

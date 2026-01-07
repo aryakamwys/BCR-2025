@@ -1,31 +1,17 @@
 import type { CsvKind } from './config';
 
-const getEnvVar = (key: string): string | undefined => {
-  if (import.meta.env?.[key]) {
-    return import.meta.env[key];
-  }
-  return undefined;
-};
-
-const SUPABASE_S3_ENDPOINT = getEnvVar('VITE_SUPABASE_S3_ENDPOINT');
-const SUPABASE_S3_BUCKET = getEnvVar('VITE_SUPABASE_S3_BUCKET');
-
-const SUPABASE_URL = SUPABASE_S3_ENDPOINT?.replace('.storage.', '.');
-const STORAGE_BUCKET = SUPABASE_S3_BUCKET;
-
-export function getPublicUrl(filePath: string): string {
-  if (!SUPABASE_URL || !STORAGE_BUCKET) {
-    throw new Error('Missing VITE_SUPABASE_S3_ENDPOINT or VITE_SUPABASE_S3_BUCKET environment variables');
-  }
-  return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${filePath}`;
+export function getPublicUrl(url: string): string {
+  return url;
 }
 
-export function getCsvPublicUrl(eventId: string, kind: CsvKind): string {
-  return getPublicUrl(`${eventId}/csv/${kind}.csv`);
+export function getCsvPublicUrl(_eventId: string, _kind: CsvKind): string {
+  // URL will be provided by the API response
+  return '';
 }
 
-export function getCsvMetaPublicUrl(eventId: string): string {
-  return getPublicUrl(`${eventId}/csv/_meta.json`);
+export function getCsvMetaPublicUrl(_eventId: string): string {
+  // URL will be provided by the API response
+  return '';
 }
 
 export type StoredCsvMeta = {
@@ -42,7 +28,7 @@ export async function fetchCsvContent(
   kind: CsvKind
 ): Promise<{ text: string; meta: StoredCsvMeta } | null> {
   try {
-    const response = await fetch(`/api/csv-read?eventId=${encodeURIComponent(eventId)}&kind=${kind}`, {
+    const response = await fetch(`/api/csv-read?kind=${kind}`, {
       cache: 'no-store',
     });
 
@@ -61,7 +47,7 @@ export async function fetchCsvContent(
         meta: data.meta || {
           kind,
           filename: `${kind}.csv`,
-          path: `${eventId}/csv/${kind}.csv`,
+          path: `csv/${kind}.csv`,
           url: '',
           rows: 0,
           updatedAt: Date.now()
@@ -74,8 +60,8 @@ export async function fetchCsvContent(
       meta: {
         kind,
         filename: data.filename || `${kind}.csv`,
-        path: `${eventId}/csv/${kind}.csv`,
-        url: '',
+        path: `csv/${kind}.csv`,
+        url: data.url || '',
         rows: data.text.split('\n').length - 1,
         updatedAt: data.updatedAt || Date.now()
       }
@@ -92,7 +78,7 @@ export async function fetchCsvMeta(
   kind: CsvKind
 ): Promise<StoredCsvMeta | null> {
   try {
-    const response = await fetch(`/api/csv-read?eventId=${encodeURIComponent(eventId)}&action=list`, {
+    const response = await fetch(`/api/csv-list`, {
       cache: 'no-store',
     });
 
@@ -109,7 +95,7 @@ export async function fetchCsvMeta(
 
 export async function fetchAllCsvMeta(eventId: string): Promise<StoredCsvMeta[]> {
   try {
-    const response = await fetch(`/api/csv-read?eventId=${encodeURIComponent(eventId)}&action=list`, {
+    const response = await fetch(`/api/csv-list`, {
       cache: 'no-store',
     });
 
@@ -136,7 +122,6 @@ export async function uploadCsvViaApi(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      eventId,
       kind,
       content: text,
       filename,
@@ -177,12 +162,8 @@ export async function deleteCsvViaApi(
   eventId: string,
   kind: CsvKind
 ): Promise<void> {
-  const response = await fetch(`/api/csv-delete`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ eventId, kind }),
+  const response = await fetch(`/api/csv-delete?kind=${kind}`, {
+    method: 'DELETE',
   });
 
   if (!response.ok) {

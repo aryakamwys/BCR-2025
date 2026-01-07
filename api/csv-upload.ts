@@ -1,6 +1,4 @@
-// API endpoint for CSV upload to Vercel Blob storage
-import { uploadCsvFile } from '../src/lib/vercelBlobStorage';
-import type { CsvKind } from '../src/lib/config';
+import { put } from '@vercel/blob';
 
 interface APIEvent {
   httpMethod: string;
@@ -14,8 +12,6 @@ interface APIResponse {
   headers: { [key: string]: string };
   body: string;
 }
-
-const VALID_KINDS: CsvKind[] = ['master', 'start', 'finish', 'checkpoint'];
 
 export default async function handler(event: APIEvent): Promise<APIResponse> {
   const headers = {
@@ -33,7 +29,7 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ error: 'Method not allowed' }),
+      body: JSON.stringify({ error: 'Method tidak diizinkan' }),
     };
   }
 
@@ -47,62 +43,47 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
     }
 
     const body = event.isBase64Encoded
-      ? JSON.parse(Buffer.from(event.body, 'base64').toString())
+      ? JSON.parse(Buffer.from(event.body as string, 'base64').toString())
       : JSON.parse(event.body);
 
-    const { eventId, kind, content, filename, rows } = body;
+    const { kind, filename, rows } = body;
 
-    // Validate required fields
-    if (!eventId) {
+    const validKinds = ['master', 'start', 'finish', 'checkpoint'];
+
+    if (!kind || !validKinds.includes(kind)) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'eventId is required' }),
+        body: JSON.stringify({
+          error: `Parameter kind harus salah satu dari: ${validKinds.join(', ')}`,
+        }),
       };
     }
 
-    if (!kind || !VALID_KINDS.includes(kind)) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: `kind must be one of: ${VALID_KINDS.join(', ')}` }),
-      };
-    }
-
-    if (!content) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'content is required' }),
-      };
-    }
-
-    // Upload to S3
-    const meta = await uploadCsvFile(
-      eventId,
-      kind as CsvKind,
-      content,
-      filename || `${kind}.csv`,
-      rows || content.split('\n').length - 1
-    );
+    const blob = await put(kind + '-' + filename, body.content || '', {
+      access: 'public',
+    });
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(meta),
+      body: JSON.stringify({
+        kind,
+        filename: blob.pathname,
+        url: blob.url,
+        downloadUrl: blob.downloadUrl,
+        rows: rows || 0,
+        updatedAt: Date.now(),
+        path: blob.pathname,
+      }),
     };
   } catch (error: any) {
-    console.error('CSV upload error:', error);
-    console.error('Error stack:', error.stack);
-    console.error('Error details:', JSON.stringify(error, null, 2));
-
-    const errorMessage = error.message || error.toString() || 'Internal server error';
+    console.error('Upload CSV error:', error);
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
-        error: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        error: error.message || 'Gagal memproses upload CSV',
       }),
     };
   }

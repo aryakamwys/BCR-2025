@@ -66,10 +66,10 @@ export async function listCsvMeta(eventId?: string): Promise<
 > {
   const targetEventId = eventId || DEFAULT_EVENT_ID;
   const metaList = await fetchAllCsvMeta(targetEventId);
-  
-  return metaList.map((meta: StoredCsvMeta) => ({
-    key: meta.kind,
-    kind: meta.kind,
+
+  return metaList.map((meta: any) => ({
+    key: meta.key || meta.kind,
+    kind: meta.key || meta.kind,
     filename: meta.filename,
     updatedAt: meta.updatedAt,
     rows: meta.rows,

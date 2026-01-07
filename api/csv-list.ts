@@ -1,20 +1,47 @@
 import { list } from '@vercel/blob';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method tidak diizinkan' });
+interface APIEvent {
+  httpMethod: string;
+  headers: { [key: string]: string };
+  queryStringParameters?: { [key: string]: string };
+}
+
+interface APIResponse {
+  statusCode: number;
+  headers: { [key: string]: string };
+  body: string;
+}
+
+export default async function handler(event: APIEvent): Promise<APIResponse> {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' };
+  }
+
+  if (event.httpMethod !== 'GET') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'Method tidak diizinkan' }),
+    };
   }
 
   try {
-    const token = (process as any).env?.BLOB_READ_WRITE_TOKEN;
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
     if (!token) {
-      return res.status(500).json({
-        error: 'BLOB_READ_WRITE_TOKEN belum dikonfigurasi',
-      });
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          error: 'BLOB_READ_WRITE_TOKEN belum dikonfigurasi',
+        }),
+      };
     }
 
     const { blobs } = await list({
@@ -31,6 +58,8 @@ export default async function handler(
 
       if (kindBlobs.length > 0) {
         const latest = kindBlobs[0];
+
+        // Try to extract row count from filename or fetch and count
         const response = await fetch(latest.url);
         const text = await response.text();
         const rows = text.split('\n').filter((line) => line.trim().length > 0).length - 1;
@@ -44,11 +73,19 @@ export default async function handler(
       }
     }
 
-    return res.status(200).json(meta);
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(meta),
+    };
   } catch (error: any) {
     console.error('List CSV error:', error);
-    return res.status(500).json({
-      error: error.message || 'Gagal mengambil daftar CSV',
-    });
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({
+        error: error.message || 'Gagal mengambil daftar CSV',
+      }),
+    };
   }
 }

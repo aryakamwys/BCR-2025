@@ -33,7 +33,7 @@ export async function getCategoriesForEvent(eventId: string): Promise<string[]> 
     }
 
     const data = await response.json();
-    return data.categories || [...DEFAULT_CATEGORIES];
+    return (data.categories && data.categories.length > 0) ? data.categories : [...DEFAULT_CATEGORIES];
   } catch (error) {
     return [...DEFAULT_CATEGORIES];
   }

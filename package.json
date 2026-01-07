@@ -8,8 +8,9 @@
     "dev:full": "concurrently \"npm run dev\" \"npm run server\"",
     "build": "vite build",
     "preview": "vite preview",
-    "server": "tsx server.ts",
+    "server": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx server.ts",
     "check:db": "tsx check-prisma-connection.ts",
+    "test:db": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx test-db.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio"
@@ -34,6 +35,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.0.2",
+    "@types/pg": "^8.16.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/react-router-dom": "^5.3.3",

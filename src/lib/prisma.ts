@@ -7,12 +7,20 @@ import path from 'node:path';
 
 const { Pool } = pg;
 
+// Set Node environment to ignore self-signed certificates
+if (process.env.NODE_ENV !== 'production') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
+
 const prismaClientSingleton = () => {
   const connectionString = process.env.DATABASE_URL;
 
   if (!connectionString) {
     throw new Error('DATABASE_URL environment variable is not set');
   }
+
+  const caPath = process.env.PGSQL_ATTR_SSL_CA || 'ca/ca.pem';
+  const absoluteCaPath = path.resolve(process.cwd(), caPath);
 
   let poolConfig: any = {
     connectionString,
@@ -21,19 +29,9 @@ const prismaClientSingleton = () => {
     },
   };
 
-  // Try to get CA certificate from environment variable first (for Railway)
-  if (process.env.DATABASE_CA_CERT) {
-    poolConfig.ssl.ca = process.env.DATABASE_CA_CERT;
-  }
-  // Then try to read from file (for local development)
-  else {
-    const caPath = process.env.PGSQL_ATTR_SSL_CA || 'ca/ca.pem';
-    const absoluteCaPath = path.resolve(process.cwd(), caPath);
-
-    if (fs.existsSync(absoluteCaPath)) {
-      const ca = fs.readFileSync(absoluteCaPath).toString();
-      poolConfig.ssl.ca = ca;
-    }
+  if (fs.existsSync(absoluteCaPath)) {
+    const ca = fs.readFileSync(absoluteCaPath).toString();
+    poolConfig.ssl.ca = ca;
   }
 
   const pool = new Pool(poolConfig);

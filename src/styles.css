@@ -1,6 +1,5 @@
-* {
-  box-sizing: border-box;
-}
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
 
 :root {
   --bg: #f5f6f8;
@@ -8,7 +7,7 @@
   --text: #0f172a;
   --muted: #64748b;
   --line: #e5e7eb;
-  --accent: #e10600; /* F1 red */
+  --accent: #FF383C;
   --accent-soft: #fff1f1;
   --gold: #f7c948;
   --silver: #cbd5e1;
@@ -17,7 +16,7 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
     sans-serif;
   background: var(--bg);
   color: var(--text);
@@ -82,7 +81,7 @@ body {
 }
 .search:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(225, 6, 0, 0.08);
+  box-shadow: 0 0 0 3px rgba(255, 56, 60, 0.08);
 }
 
 .btn {
@@ -276,7 +275,6 @@ body {
   padding: 8px;
   border-radius: 8px;
 }
-/* clickable text */
 .link-btn {
   background: transparent;
   border: none;
@@ -291,14 +289,12 @@ body {
   text-decoration: underline;
 }
 
-/* special rows for DNF/DSQ */
 .special-row td {
   background: #f9fafb;
   color: #9a3412;
   font-weight: 700;
 }
 
-/* modal */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -356,7 +352,6 @@ body {
   font-weight: 700;
 }
 
-/* admin */
 .admin-login,
 .admin-cutoff {
   margin-top: 10px;

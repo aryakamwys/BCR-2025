@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import Navbar from '../components/Navbar';
 import type { Event } from '../../api/events';
 
 export default function HomePage() {
@@ -20,6 +21,7 @@ export default function HomePage() {
         setEvents(data);
       }
     } catch (error) {
+      console.error('Failed to load events:', error);
     } finally {
       setLoading(false);
     }
@@ -43,18 +45,17 @@ export default function HomePage() {
   function getEventBadge(status: 'live' | 'upcoming' | 'completed') {
     switch (status) {
       case 'live':
-        return <span className="badge badge-live">🔴 Live</span>;
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border-2 border-red-700">🔴 Live</span>;
       case 'upcoming':
-        return <span className="badge badge-upcoming">⏰ Upcoming</span>;
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border-2 border-yellow-700">⏰ Upcoming</span>;
       case 'completed':
-        return <span className="badge badge-completed">✅ Completed</span>;
+        return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border-2 border-green-700">✅ Completed</span>;
     }
   }
 
   function getFilteredEvents() {
     let filtered = events;
 
-    // Filter by search term
     if (searchTerm) {
       filtered = filtered.filter(
         (event) =>
@@ -64,7 +65,6 @@ export default function HomePage() {
       );
     }
 
-    // Filter by status
     if (statusFilter !== 'all') {
       filtered = filtered.filter((event) => getEventStatus(event) === statusFilter);
     }
@@ -74,481 +74,201 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="home-page">
-        <div className="loading">Loading events...</div>
-      </div>
+      <>
+        <Navbar />
+        <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-indigo-600 flex items-center justify-center">
+          <p className="text-white text-2xl font-semibold">Loading events...</p>
+        </div>
+      </>
     );
   }
 
   const filteredEvents = getFilteredEvents();
 
   return (
-    <div className="home-page">
-      {/* Hero Section */}
-      <header className="home-hero">
-        <div className="hero-content">
-          <h1>BCR Race Platform</h1>
-          <p className="hero-subtitle">Professional Race Timing & Real-time Results</p>
-          <p className="hero-description">
-            Live leaderboard, tracking, and timing system for your running events
-          </p>
-          <Link to="/create-event" className="btn btn-primary btn-large">
-            + Create New Event
-          </Link>
-        </div>
-      </header>
-
-      {/* Search and Filter Section */}
-      <section className="search-section">
-        <div className="search-controls">
-          <input
-            type="text"
-            placeholder="Search events by name, location, or description..."
-            className="search-input"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-
-          <div className="filter-buttons">
-            <button
-              className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('all')}
+    <>
+      <Navbar />
+      <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-indigo-600">
+        {/* Hero Section */}
+        <header className="bg-black/30 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+            <h1 className="text-5xl font-extrabold text-white mb-4 drop-shadow-lg">BCR Race Platform</h1>
+            <p className="text-2xl font-light text-white/95 mb-2">Professional Race Timing & Real-time Results</p>
+            <p className="text-lg text-white/90 mb-8">
+              Live leaderboard, tracking, and timing system for your running events
+            </p>
+            <Link
+              to="/admin/create-event"
+              className="inline-block px-10 py-4 text-lg font-semibold bg-white text-indigo-600 rounded-full hover:bg-gray-100 hover:-translate-y-0.5 transition-all shadow-lg hover:shadow-xl"
             >
-              All Events
-            </button>
-            <button
-              className={`filter-btn ${statusFilter === 'live' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('live')}
-            >
-              🔴 Live
-            </button>
-            <button
-              className={`filter-btn ${statusFilter === 'upcoming' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('upcoming')}
-            >
-              ⏰ Upcoming
-            </button>
-            <button
-              className={`filter-btn ${statusFilter === 'completed' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('completed')}
-            >
-              ✅ Completed
-            </button>
+              + Create New Event
+            </Link>
           </div>
-        </div>
-      </section>
+        </header>
 
-      {/* Events List */}
-      <section className="events-section">
-        <h2 className="section-title">
-          {statusFilter === 'all' ? 'All Events' : `${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Events`}
-          <span className="event-count">({filteredEvents.length})</span>
-        </h2>
+        {/* Search and Filter Section */}
+        <section className="bg-white shadow-lg">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex flex-col gap-4">
+              <input
+                type="text"
+                placeholder="Search events by name, location, or description..."
+                className="w-full px-6 py-4 text-lg border-2 border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
 
-        {filteredEvents.length === 0 ? (
-          <div className="empty-state">
-            <p>No events found.</p>
-            {searchTerm && <p>Try adjusting your search or filters.</p>}
-            {!searchTerm && statusFilter === 'all' && (
-              <Link to="/create-event" className="btn btn-primary">
-                Create Your First Event
-              </Link>
-            )}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className={`px-6 py-3 rounded-full font-semibold transition-all ${
+                    statusFilter === 'all'
+                      ? 'bg-indigo-600 text-white border-2 border-indigo-600'
+                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-indigo-500 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setStatusFilter('all')}
+                >
+                  All Events
+                </button>
+                <button
+                  className={`px-6 py-3 rounded-full font-semibold transition-all ${
+                    statusFilter === 'live'
+                      ? 'bg-indigo-600 text-white border-2 border-indigo-600'
+                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-indigo-500 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setStatusFilter('live')}
+                >
+                  🔴 Live
+                </button>
+                <button
+                  className={`px-6 py-3 rounded-full font-semibold transition-all ${
+                    statusFilter === 'upcoming'
+                      ? 'bg-indigo-600 text-white border-2 border-indigo-600'
+                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-indigo-500 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setStatusFilter('upcoming')}
+                >
+                  ⏰ Upcoming
+                </button>
+                <button
+                  className={`px-6 py-3 rounded-full font-semibold transition-all ${
+                    statusFilter === 'completed'
+                      ? 'bg-indigo-600 text-white border-2 border-indigo-600'
+                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-indigo-500 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setStatusFilter('completed')}
+                >
+                  ✅ Completed
+                </button>
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="events-grid">
-            {filteredEvents.map((event) => {
-              const status = getEventStatus(event);
-              return (
-                <div key={event.id} className="event-card">
-                  <div className="event-card-header">
-                    <h3 className="event-name">{event.name}</h3>
-                    {getEventBadge(status)}
-                  </div>
+        </section>
 
-                  {event.description && (
-                    <p className="event-description">{event.description}</p>
-                  )}
+        {/* Events List */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <h2 className="text-3xl font-bold text-white mb-6 drop-shadow-md">
+            {statusFilter === 'all' ? 'All Events' : `${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Events`}
+            <span className="text-xl font-normal opacity-90 ml-2">({filteredEvents.length})</span>
+          </h2>
 
-                  <div className="event-meta">
-                    <div className="meta-item">
-                      <span className="meta-icon">📅</span>
-                      <span>{new Date(event.eventDate).toLocaleDateString('en-US', {
-                        weekday: 'short',
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                      })}</span>
+          {filteredEvents.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center shadow-xl">
+              <p className="text-gray-600 text-xl mb-4">No events found.</p>
+              {searchTerm && <p className="text-gray-500 mb-6">Try adjusting your search or filters.</p>}
+              {!searchTerm && statusFilter === 'all' && (
+                <Link
+                  to="/admin/create-event"
+                  className="inline-block px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+                >
+                  Create Your First Event
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredEvents.map((event) => {
+                const status = getEventStatus(event);
+                return (
+                  <div
+                    key={event.id}
+                    className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col gap-4"
+                  >
+                    <div className="flex justify-between items-start gap-3">
+                      <h3 className="text-2xl font-bold text-gray-900 flex-1">{event.name}</h3>
+                      {getEventBadge(status)}
                     </div>
 
-                    {event.location && (
-                      <div className="meta-item">
-                        <span className="meta-icon">📍</span>
-                        <span>{event.location}</span>
-                      </div>
+                    {event.description && (
+                      <p className="text-gray-600 leading-relaxed">{event.description}</p>
                     )}
 
-                    <div className="meta-item">
-                      <span className="meta-icon">👥</span>
-                      <span>{event.participantCount || 0} participants</span>
-                    </div>
-
-                    <div className="meta-item">
-                      <span className="meta-icon">🏃</span>
-                      <span>{event.categories.length} categories</span>
-                    </div>
-                  </div>
-
-                  <div className="event-categories">
-                    <strong>Categories:</strong>
-                    <div className="category-tags">
-                      {event.categories.slice(0, 3).map((cat) => (
-                        <span key={cat} className="category-tag">
-                          {cat}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center gap-2 text-gray-700">
+                        <span className="text-xl">📅</span>
+                        <span className="text-sm font-medium">
+                          {new Date(event.eventDate).toLocaleDateString('en-US', {
+                            weekday: 'short',
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
                         </span>
-                      ))}
-                      {event.categories.length > 3 && (
-                        <span className="category-tag">+{event.categories.length - 3} more</span>
+                      </div>
+
+                      {event.location && (
+                        <div className="flex items-center gap-2 text-gray-700">
+                          <span className="text-xl">📍</span>
+                          <span className="text-sm font-medium">{event.location}</span>
+                        </div>
                       )}
+
+
+                      <div className="flex items-center gap-2 text-gray-700">
+                        <span className="text-xl">🏃</span>
+                        <span className="text-sm font-medium">{event.categories.length} categories</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-gray-200">
+                      <p className="text-sm font-semibold text-gray-900 mb-2">Categories:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {event.categories.slice(0, 3).map((cat) => (
+                          <span
+                            key={cat}
+                            className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium"
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                        {event.categories.length > 3 && (
+                          <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
+                            +{event.categories.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 pt-4 border-t border-gray-200">
+                      <Link
+                        to={`/event/${event.slug}`}
+                        className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold text-center hover:bg-indigo-700 hover:-translate-y-0.5 transition-all shadow-md hover:shadow-lg"
+                      >
+                        View Results →
+                      </Link>
+                      <Link
+                        to={`/event/${event.slug}/admin`}
+                        className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold text-center hover:bg-gray-200 transition-colors"
+                      >
+                        Admin Panel
+                      </Link>
                     </div>
                   </div>
-
-                  <div className="event-actions">
-                    <Link to={`/event/${event.slug}`} className="btn btn-primary btn-block">
-                      View Results →
-                    </Link>
-                    <Link to={`/event/${event.slug}/admin`} className="btn btn-secondary btn-block">
-                      Admin Panel
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <style>{`
-        .home-page {
-          min-height: 100vh;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-
-        .home-hero {
-          background: rgba(0, 0, 0, 0.3);
-          color: white;
-          padding: 4rem 2rem;
-          text-align: center;
-          backdrop-filter: blur(10px);
-        }
-
-        .hero-content h1 {
-          font-size: 3rem;
-          font-weight: 800;
-          margin: 0 0 1rem 0;
-          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-
-        .hero-subtitle {
-          font-size: 1.5rem;
-          margin: 0 0 0.5rem 0;
-          font-weight: 300;
-          opacity: 0.95;
-        }
-
-        .hero-description {
-          font-size: 1.1rem;
-          margin: 0 0 2rem 0;
-          opacity: 0.9;
-        }
-
-        .btn-large {
-          padding: 1rem 2.5rem;
-          font-size: 1.1rem;
-          font-weight: 600;
-          border-radius: 50px;
-          background: white;
-          color: #667eea;
-          border: none;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          text-decoration: none;
-          display: inline-block;
-        }
-
-        .btn-large:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-        }
-
-        .search-section {
-          background: white;
-          padding: 2rem;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .search-controls {
-          max-width: 1200px;
-          margin: 0 auto;
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .search-input {
-          width: 100%;
-          padding: 1rem 1.5rem;
-          font-size: 1rem;
-          border: 2px solid #e5e7eb;
-          border-radius: 10px;
-          outline: none;
-          transition: border-color 0.2s;
-        }
-
-        .search-input:focus {
-          border-color: #667eea;
-        }
-
-        .filter-buttons {
-          display: flex;
-          gap: 0.5rem;
-          flex-wrap: wrap;
-        }
-
-        .filter-btn {
-          padding: 0.75rem 1.5rem;
-          border: 2px solid #e5e7eb;
-          background: white;
-          border-radius: 25px;
-          cursor: pointer;
-          font-weight: 500;
-          transition: all 0.2s;
-        }
-
-        .filter-btn:hover {
-          border-color: #667eea;
-          background: #f9fafb;
-        }
-
-        .filter-btn.active {
-          background: #667eea;
-          color: white;
-          border-color: #667eea;
-        }
-
-        .events-section {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 2rem;
-        }
-
-        .section-title {
-          font-size: 2rem;
-          font-weight: 700;
-          margin-bottom: 1.5rem;
-          color: white;
-          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .event-count {
-          font-size: 1.2rem;
-          font-weight: 400;
-          margin-left: 0.5rem;
-          opacity: 0.9;
-        }
-
-        .empty-state {
-          background: white;
-          border-radius: 10px;
-          padding: 3rem;
-          text-align: center;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .events-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-          gap: 1.5rem;
-        }
-
-        .event-card {
-          background: white;
-          border-radius: 10px;
-          padding: 1.5rem;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-          transition: all 0.3s ease;
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .event-card:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
-        }
-
-        .event-card-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 1rem;
-        }
-
-        .event-name {
-          font-size: 1.5rem;
-          font-weight: 700;
-          margin: 0;
-          color: #1f2937;
-          flex: 1;
-        }
-
-        .badge {
-          padding: 0.35rem 0.75rem;
-          border-radius: 20px;
-          font-size: 0.85rem;
-          font-weight: 600;
-          white-space: nowrap;
-        }
-
-        .badge-live {
-          background: #fef2f2;
-          color: #dc2626;
-          border: 2px solid #dc2626;
-        }
-
-        .badge-upcoming {
-          background: #fef3c7;
-          color: #d97706;
-          border: 2px solid #d97706;
-        }
-
-        .badge-completed {
-          background: #d1fae5;
-          color: #059669;
-          border: 2px solid #059669;
-        }
-
-        .event-description {
-          color: #6b7280;
-          margin: 0;
-          line-height: 1.5;
-        }
-
-        .event-meta {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 0.75rem;
-        }
-
-        .meta-item {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          color: #4b5563;
-        }
-
-        .meta-icon {
-          font-size: 1.2rem;
-        }
-
-        .event-categories {
-          padding-top: 1rem;
-          border-top: 1px solid #e5e7eb;
-        }
-
-        .event-categories strong {
-          display: block;
-          margin-bottom: 0.5rem;
-          color: #1f2937;
-        }
-
-        .category-tags {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.5rem;
-        }
-
-        .category-tag {
-          background: #f3f4f6;
-          color: #4b5563;
-          padding: 0.35rem 0.75rem;
-          border-radius: 15px;
-          font-size: 0.85rem;
-          font-weight: 500;
-        }
-
-        .event-actions {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-          padding-top: 1rem;
-          border-top: 1px solid #e5e7eb;
-        }
-
-        .btn {
-          padding: 0.75rem 1.5rem;
-          border-radius: 8px;
-          font-weight: 600;
-          text-align: center;
-          text-decoration: none;
-          cursor: pointer;
-          transition: all 0.2s;
-          border: none;
-          display: block;
-        }
-
-        .btn-block {
-          width: 100%;
-        }
-
-        .btn-primary {
-          background: #667eea;
-          color: white;
-        }
-
-        .btn-primary:hover {
-          background: #5568d3;
-          transform: translateY(-1px);
-        }
-
-        .btn-secondary {
-          background: #f3f4f6;
-          color: #4b5563;
-        }
-
-        .btn-secondary:hover {
-          background: #e5e7eb;
-        }
-
-        .loading {
-          text-align: center;
-          padding: 4rem;
-          color: white;
-          font-size: 1.5rem;
-        }
-
-        @media (max-width: 768px) {
-          .hero-content h1 {
-            font-size: 2rem;
-          }
-
-          .hero-subtitle {
-            font-size: 1.2rem;
-          }
-
-          .events-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .event-meta {
-            grid-template-columns: 1fr;
-          }
-
-          .filter-buttons {
-            justify-content: center;
-          }
-        }
-      `}</style>
-    </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+    </>
   );
 }

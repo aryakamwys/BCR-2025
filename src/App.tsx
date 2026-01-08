@@ -7,6 +7,7 @@ import CategorySection from "./components/CategorySection";
 import LeaderboardTable, { LeaderRow } from "./components/LeaderboardTable";
 import ParticipantModal from "./components/ParticipantModal";
 import AdminPage from "./components/AdminPage";
+import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
 import EventPage from "./pages/EventPage";
 import CreateEventPage from "./pages/CreateEventPage";
@@ -359,35 +360,11 @@ function LeaderboardApp() {
 
   // ✅ Setelah first load: UI selalu tampil, meskipun data lagi refresh di background
   return (
-    <div className="page">
-      {/* Event Selector */}
-      {events.length > 0 && (
-        <div style={{ marginBottom: '10px', textAlign: 'center' }}>
-          <select
-            value={currentEvent?.id || ''}
-            onChange={(e) => {
-              const selected = events.find((ev: any) => ev.id === e.target.value);
-              if (selected) setCurrentEvent(selected);
-            }}
-            style={{
-              padding: '8px 12px',
-              fontSize: '14px',
-              borderRadius: '4px',
-              border: '1px solid #ddd',
-              maxWidth: '400px',
-              width: '100%'
-            }}
-          >
-            {events.map((ev: any) => (
-              <option key={ev.id} value={ev.id}>
-                {ev.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+    <>
+      <Navbar showAdminButton={true} onAdminClick={() => setActiveTab("Admin")} />
 
-      <h1 className="app-title">{eventTitle}</h1>
+      <div className="page">
+        <h1 className="app-title">{eventTitle}</h1>
 
       <div className="tabs">
         {tabs.map((t) => (
@@ -473,6 +450,7 @@ function LeaderboardApp() {
         data={modalData}
       />
     </div>
+    </>
   );
 }
 

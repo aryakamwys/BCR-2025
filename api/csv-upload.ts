@@ -1,4 +1,5 @@
 import { put } from '@vercel/blob';
+import prisma from '../src/lib/prisma';
 
 interface APIEvent {
   httpMethod: string;
@@ -46,7 +47,27 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       ? JSON.parse(Buffer.from(event.body as string, 'base64').toString())
       : JSON.parse(event.body);
 
-    const { kind, filename, rows } = body;
+    const { kind, filename, rows, eventId } = body;
+
+    const effectiveEventId = eventId || 'default';
+
+    let eventFolderName = effectiveEventId;
+    if (effectiveEventId !== 'default') {
+      try {
+        const eventRecord = await prisma.event.findUnique({
+          where: { id: effectiveEventId },
+          select: { name: true },
+        });
+        if (eventRecord?.name) {
+          eventFolderName = eventRecord.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '');
+        }
+      } catch {
+        eventFolderName = effectiveEventId;
+      }
+    }
 
     const validKinds = ['master', 'start', 'finish', 'checkpoint'];
 
@@ -60,7 +81,10 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       };
     }
 
-    const blob = await put(kind + '-' + filename, body.content || '', {
+    // Create folder structure: events/{eventName}/{kind}-{timestamp}-{filename}
+    const timestamp = Date.now();
+    const blobPath = `events/${eventFolderName}/${kind}-${timestamp}-${filename}`;
+    const blob = await put(blobPath, body.content || '', {
       access: 'public',
     });
 

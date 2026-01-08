@@ -28,7 +28,7 @@ export async function fetchCsvContent(
   kind: CsvKind
 ): Promise<{ text: string; meta: StoredCsvMeta } | null> {
   try {
-    const response = await fetch(`/api/csv-read?kind=${kind}`, {
+    const response = await fetch(`/api/csv-read?kind=${kind}&eventId=${encodeURIComponent(eventId)}`, {
       cache: 'no-store',
     });
 
@@ -78,7 +78,7 @@ export async function fetchCsvMeta(
   kind: CsvKind
 ): Promise<StoredCsvMeta | null> {
   try {
-    const response = await fetch(`/api/csv-list`, {
+    const response = await fetch(`/api/csv-list?eventId=${encodeURIComponent(eventId)}`, {
       cache: 'no-store',
     });
 
@@ -95,7 +95,7 @@ export async function fetchCsvMeta(
 
 export async function fetchAllCsvMeta(eventId: string): Promise<StoredCsvMeta[]> {
   try {
-    const response = await fetch(`/api/csv-list`, {
+    const response = await fetch(`/api/csv-list?eventId=${encodeURIComponent(eventId)}`, {
       cache: 'no-store',
     });
 
@@ -122,6 +122,7 @@ export async function uploadCsvViaApi(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
+      eventId,
       kind,
       content: text,
       filename,
@@ -162,7 +163,7 @@ export async function deleteCsvViaApi(
   eventId: string,
   kind: CsvKind
 ): Promise<void> {
-  const response = await fetch(`/api/csv-delete?kind=${kind}`, {
+  const response = await fetch(`/api/csv-delete?kind=${kind}&eventId=${encodeURIComponent(eventId)}`, {
     method: 'DELETE',
   });
 

@@ -1,4 +1,5 @@
 import { list } from '@vercel/blob';
+import prisma from '../src/lib/prisma';
 
 interface APIEvent {
   httpMethod: string;
@@ -34,6 +35,7 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
 
   try {
     const kind = event.queryStringParameters?.kind;
+    const eventId = event.queryStringParameters?.eventId || 'default';
 
     if (!kind || typeof kind !== 'string') {
       return {
@@ -56,8 +58,27 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       };
     }
 
+    let eventFolderName = eventId;
+    if (eventId !== 'default') {
+      try {
+        const eventRecord = await prisma.event.findUnique({
+          where: { id: eventId },
+          select: { name: true },
+        });
+        if (eventRecord?.name) {
+          eventFolderName = eventRecord.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '');
+        }
+      } catch {
+        eventFolderName = eventId;
+      }
+    }
+
+    // Use eventId prefix to separate CSV data per event (folder structure)
     const { blobs } = await list({
-      prefix: `${kind}-`,
+      prefix: `events/${eventFolderName}/${kind}-`,
       token,
     });
 

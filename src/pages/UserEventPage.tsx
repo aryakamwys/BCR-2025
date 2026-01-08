@@ -57,20 +57,19 @@ export default function UserEventPage() {
     <>
       <Navbar />
 
-      <div className="min-h-screen bg-white">
-
+      <div className="min-h-screen bg-white flex flex-col">
         {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold mb-2 text-gray-800">
-              Our Running Events
-            </h1>
-            <p className="text-lg text-gray-600">
-              Explore exciting running events across Indonesia
-            </p>
-          </div>
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-bold mb-2 text-gray-800">
+            Our Running Events
+          </h1>
+          <p className="text-lg text-gray-600">
+            Explore exciting running events across Indonesia
+          </p>
+        </div>
 
         {/* Hero Section with OpenStreetMap */}
-        <div className="relative h-[500px]">
+        <div className="relative h-[500px] flex-shrink-0">
           {/* OpenStreetMap Embed */}
           <iframe
             src="https://www.openstreetmap.org/export/embed.html?bbox=106.7,-6.3,106.9,-6.1&layer=mapnik&marker=-6.1751,106.8272"

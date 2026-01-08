@@ -567,7 +567,7 @@ export default function AdminPage({
           color: '#0d47a1',
           fontSize: '14px'
         }}>
-          <strong>ℹ️ Tips:</strong> Setiap event memiliki kategori dan data CSV sendiri.
+          <strong>ℹ️:</strong> Setiap event memiliki kategori dan data CSV sendiri.
           Pilih event dari data table di bawah untuk mengelola event tersebut.
         </div>
 

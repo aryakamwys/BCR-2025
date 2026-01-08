@@ -7,6 +7,7 @@ import CategorySection from "../components/CategorySection";
 import LeaderboardTable, { LeaderRow } from "../components/LeaderboardTable";
 import ParticipantModal from "../components/ParticipantModal";
 import AdminPage from "../components/AdminPage";
+import Navbar from "../components/Navbar";
 import {
   loadMasterParticipants,
   loadTimesMap,
@@ -387,11 +388,13 @@ export default function EventPage() {
   const needsFirstUpload = !hasLoadedOnce && (state.status === "loading" || state.status === "error");
 
   return (
-    <div className="page">
-      <div className="event-header">
-        <Link to="/" className="back-link">← Back to Events</Link>
-        <h1 className="app-title">{eventTitle}</h1>
-      </div>
+    <>
+      <Navbar />
+      <div className="page">
+        <div className="event-header">
+          <Link to="/" className="back-link">← Back to Events</Link>
+          <h1 className="app-title">{eventTitle}</h1>
+        </div>
 
       <div className="tabs">
         {tabs.map((t) => (
@@ -405,7 +408,7 @@ export default function EventPage() {
         ))}
       </div>
 
-      {/* ✅ Notice: first-time setup / missing upload */}
+      {/*  Notice: first-time setup / missing upload */}
       {needsFirstUpload && activeTab !== "Admin" && (
         <div className="card">
           <div className="error-title">Data belum siap</div>
@@ -496,6 +499,7 @@ export default function EventPage() {
           text-decoration: underline;
         }
       `}</style>
-    </div>
+      </div>
+    </>
   );
 }

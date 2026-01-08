@@ -20,26 +20,14 @@ export default function Navbar({ showAdminButton = false, onAdminClick }: Navbar
   return (
     <nav className="bg-white border-b-2 border-red-500 shadow-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto pl-2 pr-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
-            <img src="/Assets/logo.jpeg" alt="Logo" className="h-14 w-auto object-contain" />
+            <img src="/Assets/logo.png" alt="Logo" className="h-14 w-auto object-contain" />
           </Link>
 
-          {/* Center Section - Links & Event Selector */}
+          {/* Center Section - Event Selector */}
           <div className="flex items-center gap-6">
-            <Link
-              to="/leaderboard"
-              className={`text-sm font-semibold transition-colors relative ${
-                isLeaderboard ? 'text-accent' : 'text-gray-900 hover:text-accent'
-              }`}
-            >
-              Leaderboard
-              {isLeaderboard && (
-                <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-accent" />
-              )}
-            </Link>
-
             {events.length > 0 && (
               <div className="flex items-center gap-2">
                 <select
@@ -57,8 +45,32 @@ export default function Navbar({ showAdminButton = false, onAdminClick }: Navbar
             )}
           </div>
 
-          {/* Right Section - Admin Button */}
+          {/* Right Section - Leaderboard, Events Link & Admin Button */}
           <div className="flex items-center gap-4">
+            <Link
+              to="/leaderboard"
+              className={`text-sm font-semibold transition-colors relative ${
+                isLeaderboard ? 'text-accent' : 'text-gray-900 hover:text-accent'
+              }`}
+            >
+              Leaderboard
+              {isLeaderboard && (
+                <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-accent" />
+              )}
+            </Link>
+
+            <Link
+              to="/event"
+              className={`text-sm font-semibold transition-colors relative ${
+                location.pathname === '/event' ? 'text-accent' : 'text-gray-900 hover:text-accent'
+              }`}
+            >
+              Events
+              {location.pathname === '/event' && (
+                <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-accent" />
+              )}
+            </Link>
+
             {showAdminButton && onAdminClick && (
               <button
                 onClick={onAdminClick}

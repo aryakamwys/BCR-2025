@@ -12,6 +12,7 @@ import HomePage from "./pages/HomePage";
 import EventPage from "./pages/EventPage";
 import CreateEventPage from "./pages/CreateEventPage";
 import LandingPage from "./pages/LandingPage";
+import UserEventPage from "./pages/UserEventPage";
 import { EventProvider, useEvent } from "./contexts/EventContext";
 import {
   loadMasterParticipants,
@@ -461,6 +462,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/leaderboard" element={<LeaderboardApp />} />
+        <Route path="/event" element={<UserEventPage />} />
 
         <Route path="/admin/home" element={<HomePage />} />
         <Route path="/admin/create-event" element={<CreateEventPage />} />

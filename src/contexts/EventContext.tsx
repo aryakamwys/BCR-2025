@@ -7,6 +7,8 @@ interface Event {
   description?: string;
   eventDate: string;
   location?: string;
+  latitude?: number;
+  longitude?: number;
   isActive: boolean;
 }
 

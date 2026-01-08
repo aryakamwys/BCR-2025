@@ -358,3 +358,67 @@ body {
   display: grid;
   gap: 8px;
 }
+
+/* Custom Leaflet Popup Styling */
+.custom-popup .leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  padding: 0;
+}
+
+.custom-popup .leaflet-popup-content {
+  margin: 0;
+  min-width: 280px;
+}
+
+.custom-popup .leaflet-popup-tip {
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.15);
+}
+
+/* Custom marker animation */
+@keyframes marker-pulse {
+  0%, 100% {
+    transform: rotate(-45deg) scale(1);
+  }
+  50% {
+    transform: rotate(-45deg) scale(1.1);
+  }
+}
+
+.custom-marker {
+  animation: marker-pulse 2s ease-in-out infinite;
+}
+
+/* Responsive map adjustments */
+@media (max-width: 768px) {
+  .custom-popup .leaflet-popup-content {
+    min-width: 240px;
+  }
+}
+
+/* Leaflet Map Container Fixes */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+}
+
+.leaflet-map-pane {
+  z-index: 1;
+}
+
+.leaflet-tile-pane {
+  z-index: 2;
+}
+
+.leaflet-overlay-pane {
+  z-index: 3;
+}
+
+.leaflet-marker-pane {
+  z-index: 4;
+}
+
+.leaflet-popup-pane {
+  z-index: 5;
+}

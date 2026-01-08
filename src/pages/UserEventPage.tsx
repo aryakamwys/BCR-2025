@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import EventMap from "../components/EventMap";
 
 interface Event {
   id: string;
@@ -10,6 +11,8 @@ interface Event {
   slug: string;
   description?: string;
   location?: string;
+  latitude?: number;
+  longitude?: number;
   date?: string;
   categories?: string[];
   status?: 'upcoming' | 'ongoing' | 'completed';
@@ -68,17 +71,9 @@ export default function UserEventPage() {
           </p>
         </div>
 
-        {/* Hero Section with OpenStreetMap */}
-        <div className="relative h-[500px] flex-shrink-0">
-          {/* OpenStreetMap Embed */}
-          <iframe
-            src="https://www.openstreetmap.org/export/embed.html?bbox=106.7,-6.3,106.9,-6.1&layer=mapnik&marker=-6.1751,106.8272"
-            width="100%"
-            height="100%"
-            style={{ border: 0 }}
-            title="Event Map"
-            className="opacity-80"
-          ></iframe>
+        {/* Hero Section with Interactive Map */}
+        <div className="relative h-[700px] flex-shrink-0 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto rounded-lg overflow-hidden shadow-lg">
+          <EventMap events={events} onEventClick={handleEventClick} />
         </div>
 
         {/* Header and Carousel Section - Below Map */}

@@ -13,6 +13,8 @@ model Event {
   description String?
   eventDate   DateTime
   location    String?
+  latitude    Float?
+  longitude   Float?
   isActive    Boolean    @default(true)
   categories  Category[]
   banners     Banner[]

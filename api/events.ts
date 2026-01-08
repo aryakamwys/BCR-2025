@@ -21,6 +21,8 @@ export interface Event {
   description: string;
   eventDate: string;
   location?: string;
+  latitude?: number;
+  longitude?: number;
   isActive: boolean;
   createdAt: number;
   categories: string[];
@@ -34,6 +36,8 @@ function formatEvent(event: any): Event {
     description: event.description || '',
     eventDate: event.eventDate.toISOString(),
     location: event.location || '',
+    latitude: event.latitude || undefined,
+    longitude: event.longitude || undefined,
     isActive: event.isActive,
     categories: event.categories.map((c: any) => c.name),
     createdAt: event.createdAt.getTime(),
@@ -141,6 +145,24 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
         };
       }
 
+      // Geocode location to get coordinates
+      let latitude = null;
+      let longitude = null;
+
+      if (location && location.trim().length > 0) {
+        try {
+          const { geocodeLocation } = await import('../src/lib/geocoding');
+          const coords = await geocodeLocation(location);
+          if (coords) {
+            latitude = coords.latitude;
+            longitude = coords.longitude;
+          }
+        } catch (error) {
+          console.error('Geocoding failed for location:', location, error);
+          // Continue without coordinates - event is still created
+        }
+      }
+
       const baseSlug = name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
@@ -170,6 +192,8 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
           description,
           eventDate: new Date(eventDate),
           location,
+          latitude,
+          longitude,
           isActive: isActive !== undefined ? isActive : true,
           categories: {
             create: defaultCategories.map((name: string, order: number) => ({
@@ -217,6 +241,39 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
 
       const { name, description, eventDate, location, isActive } = body;
 
+      // If location is being updated, re-geocode to get new coordinates
+      let latitude = undefined;
+      let longitude = undefined;
+
+      if (location !== undefined) {
+        // Get current event to check if location changed
+        const currentEvent = await prisma.event.findUnique({
+          where: { id: eventId },
+          select: { location: true },
+        });
+
+        if (currentEvent && currentEvent.location !== location) {
+          // Location changed, re-geocode
+          if (location && location.trim().length > 0) {
+            try {
+              const { geocodeLocation } = await import('../src/lib/geocoding');
+              const coords = await geocodeLocation(location);
+              if (coords) {
+                latitude = coords.latitude;
+                longitude = coords.longitude;
+              }
+            } catch (error) {
+              console.error('Geocoding failed for location:', location, error);
+              // Continue without updating coordinates
+            }
+          } else {
+            // Location cleared, remove coordinates
+            latitude = null;
+            longitude = null;
+          }
+        }
+      }
+
       const updatedEvent = await prisma.event.update({
         where: { id: eventId },
         data: {
@@ -224,6 +281,8 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
           ...(description !== undefined && { description }),
           ...(eventDate && { eventDate: new Date(eventDate) }),
           ...(location !== undefined && { location }),
+          ...(latitude !== undefined && { latitude }),
+          ...(longitude !== undefined && { longitude }),
           ...(isActive !== undefined && { isActive }),
         },
         include: {

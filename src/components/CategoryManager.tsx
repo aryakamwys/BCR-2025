@@ -24,21 +24,19 @@ export default function CategoryManager({ eventId, onCategoriesChange }: Categor
   async function loadCategories() {
     setLoading(true);
     try {
-      // For 'default' eventId, just use default categories
-      if (eventId === 'default') {
-        setCategories([...DEFAULT_CATEGORIES]);
-        setLoading(false);
-        return;
-      }
-
       const response = await fetch(`/api/categories?eventId=${encodeURIComponent(eventId)}`);
       if (response.ok) {
         const data = await response.json();
         if (data.categories && data.categories.length > 0) {
           setCategories(data.categories);
+        } else {
+          setCategories([...DEFAULT_CATEGORIES]);
         }
+      } else {
+        setCategories([...DEFAULT_CATEGORIES]);
       }
     } catch (error) {
+      setCategories([...DEFAULT_CATEGORIES]);
     } finally {
       setLoading(false);
     }
@@ -47,16 +45,6 @@ export default function CategoryManager({ eventId, onCategoriesChange }: Categor
   async function saveCategories() {
     setSaving(true);
     try {
-      // For 'default' eventId, show warning - must select an event first
-      if (eventId === 'default') {
-        setMessageType('error');
-        setMessageText('Please select or create an event first to save categories to database!');
-        setShowMessage(true);
-        setTimeout(() => setShowMessage(false), 5000);
-        setSaving(false);
-        return;
-      }
-
       const response = await fetch(`/api/categories?eventId=${encodeURIComponent(eventId)}`, {
         method: 'POST',
         headers: {
@@ -71,7 +59,7 @@ export default function CategoryManager({ eventId, onCategoriesChange }: Categor
       }
 
       setMessageType('success');
-      setMessageText('Categories saved to database!');
+      setMessageText('Categories saved successfully!');
       setShowMessage(true);
       onCategoriesChange?.(categories);
 

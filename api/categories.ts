@@ -1,4 +1,5 @@
 import prisma from '../src/lib/prisma';
+import { getDefaultCategories, saveDefaultCategories, resetDefaultCategories } from '../src/lib/defaultCategories';
 
 interface APIEvent {
   httpMethod: string;
@@ -13,13 +14,6 @@ interface APIResponse {
   headers: { [key: string]: string };
   body: string;
 }
-
-const DEFAULT_CATEGORIES = [
-  '10K Laki-laki',
-  '10K Perempuan',
-  '5K Laki-Laki',
-  '5K Perempuan',
-];
 
 export default async function handler(event: APIEvent): Promise<APIResponse> {
   const headers = {
@@ -48,7 +42,18 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       };
     }
 
+    const isDefault = eventId === 'default';
+
     if (event.httpMethod === 'GET') {
+      if (isDefault) {
+        const categories = await getDefaultCategories();
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ categories }),
+        };
+      }
+
       const categories = await prisma.category.findMany({
         where: { eventId },
         orderBy: { order: 'asc' },
@@ -94,6 +99,15 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
         };
       }
 
+      if (isDefault) {
+        const saved = await saveDefaultCategories(categories);
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ categories: saved }),
+        };
+      }
+
       await prisma.category.deleteMany({
         where: { eventId },
       });
@@ -121,9 +135,25 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
     }
 
     if (event.httpMethod === 'DELETE') {
+      if (isDefault) {
+        const categories = await resetDefaultCategories();
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ categories }),
+        };
+      }
+
       await prisma.category.deleteMany({
         where: { eventId },
       });
+
+      const DEFAULT_CATEGORIES = [
+        '10K Laki-laki',
+        '10K Perempuan',
+        '5K Laki-Laki',
+        '5K Perempuan',
+      ];
 
       await prisma.category.createMany({
         data: DEFAULT_CATEGORIES.map((name, order) => ({

@@ -558,6 +558,19 @@ export default function AdminPage({
           </button>
         </div>
 
+        <div style={{
+          marginTop: '1rem',
+          padding: '0.75rem',
+          background: '#e7f3ff',
+          border: '1px solid #2196F3',
+          borderRadius: '4px',
+          color: '#0d47a1',
+          fontSize: '14px'
+        }}>
+          <strong>ℹ️ Tips:</strong> Setiap event memiliki kategori dan data CSV sendiri.
+          Pilih event dari data table di bawah untuk mengelola event tersebut.
+        </div>
+
         {showEventForm && (
           <div style={{ marginTop: "1rem", padding: "1rem", background: "#f9fafb", borderRadius: "8px" }}>
             <div style={{ marginBottom: "1rem" }}>
@@ -855,7 +868,7 @@ export default function AdminPage({
         </div>
       )}
 
-      {/* Category Management - Always show, use 'default' eventId if not provided */}
+      {/* Category Management - Available for all events including default */}
       <CategoryManager
         eventId={eventId || 'default'}
         onCategoriesChange={(newCategories) => {

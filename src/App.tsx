@@ -11,6 +11,7 @@ import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
 import EventPage from "./pages/EventPage";
 import CreateEventPage from "./pages/CreateEventPage";
+import LandingPage from "./pages/LandingPage";
 import { EventProvider, useEvent } from "./contexts/EventContext";
 import {
   loadMasterParticipants,
@@ -458,7 +459,8 @@ export default function App() {
   return (
     <EventProvider>
       <Routes>
-        <Route path="/" element={<LeaderboardApp />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/leaderboard" element={<LeaderboardApp />} />
 
         <Route path="/admin/home" element={<HomePage />} />
         <Route path="/admin/create-event" element={<CreateEventPage />} />

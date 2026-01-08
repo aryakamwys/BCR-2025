@@ -10,7 +10,7 @@ export default function Navbar({ showAdminButton = false, onAdminClick }: Navbar
   const location = useLocation();
   const { currentEvent, events, setCurrentEvent } = useEvent();
 
-  const isLeaderboard = location.pathname === '/';
+  const isLeaderboard = location.pathname === '/leaderboard';
 
   const handleEventChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = events.find((ev: any) => ev.id === e.target.value);
@@ -29,7 +29,7 @@ export default function Navbar({ showAdminButton = false, onAdminClick }: Navbar
           {/* Center Section - Links & Event Selector */}
           <div className="flex items-center gap-6">
             <Link
-              to="/"
+              to="/leaderboard"
               className={`text-sm font-semibold transition-colors relative ${
                 isLeaderboard ? 'text-accent' : 'text-gray-900 hover:text-accent'
               }`}

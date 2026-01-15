@@ -1,5 +1,5 @@
-// API endpoint for banner image upload to S3 storage
-import { uploadBannerImage } from '../src/lib/vercelBlobStorage';
+// API endpoint for banner image upload to local storage
+import { uploadBannerImage } from '../src/lib/fileStorage';
 import prisma from '../src/lib/prisma';
 
 interface APIEvent {
@@ -135,12 +135,8 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       };
     }
 
-    // Create a File-like object for upload
-    const fileBlob = new Blob([file.data], { type: file.type });
-    const uploadFile = new File([fileBlob], file.name, { type: file.type });
-
-    // Upload to S3
-    const result = await uploadBannerImage(eventId, uploadFile);
+    // Upload to local filesystem
+    const result = await uploadBannerImage(eventId, file.data, file.name);
 
     // Also save to database
     const alt = fields.alt || file.name;

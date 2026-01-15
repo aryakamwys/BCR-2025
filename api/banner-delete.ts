@@ -1,5 +1,5 @@
-// API endpoint for banner delete from S3 storage
-import { deleteFile } from '../src/lib/vercelBlobStorage';
+// API endpoint for banner delete from local storage
+import { deleteFile, deleteFileByUrl } from '../src/lib/fileStorage';
 import prisma from '../src/lib/prisma';
 
 interface APIEvent {
@@ -48,15 +48,22 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       ? JSON.parse(Buffer.from(event.body, 'base64').toString())
       : JSON.parse(event.body);
 
-    const { path, bannerId } = body;
+    const { path, bannerId, url } = body;
 
-    // Delete from S3 if path provided
+    // Delete from local filesystem if path or url provided
     if (path) {
       try {
         await deleteFile(path);
       } catch (error) {
-        console.error('Error deleting file from S3:', error);
-        // Continue even if S3 delete fails
+        console.error('Error deleting file from filesystem:', error);
+        // Continue even if filesystem delete fails
+      }
+    } else if (url) {
+      try {
+        await deleteFileByUrl(url);
+      } catch (error) {
+        console.error('Error deleting file by URL:', error);
+        // Continue even if filesystem delete fails
       }
     }
 

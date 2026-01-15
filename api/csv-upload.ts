@@ -1,4 +1,4 @@
-import { put } from '@vercel/blob';
+import { uploadCsvFile } from '../src/lib/fileStorage';
 import prisma from '../src/lib/prisma';
 
 interface APIEvent {
@@ -47,7 +47,7 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       ? JSON.parse(Buffer.from(event.body as string, 'base64').toString())
       : JSON.parse(event.body);
 
-    const { kind, filename, rows, eventId } = body;
+    const { kind, filename, rows, eventId, content } = body;
 
     const effectiveEventId = eventId || 'default';
 
@@ -81,24 +81,26 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       };
     }
 
-    // Create folder structure: events/{eventName}/{kind}-{timestamp}-{filename}
-    const timestamp = Date.now();
-    const blobPath = `events/${eventFolderName}/${kind}-${timestamp}-${filename}`;
-    const blob = await put(blobPath, body.content || '', {
-      access: 'public',
-    });
+    // Upload to local filesystem
+    const result = await uploadCsvFile(
+      eventFolderName,
+      kind,
+      content || '',
+      filename,
+      rows || 0
+    );
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         kind,
-        filename: blob.pathname,
-        url: blob.url,
-        downloadUrl: blob.downloadUrl,
-        rows: rows || 0,
-        updatedAt: Date.now(),
-        path: blob.pathname,
+        filename: result.filename,
+        url: result.url,
+        downloadUrl: result.url,
+        rows: result.rows,
+        updatedAt: result.updatedAt,
+        path: result.path,
       }),
     };
   } catch (error: any) {

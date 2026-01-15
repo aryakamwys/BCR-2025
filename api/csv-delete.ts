@@ -1,4 +1,4 @@
-import { del, list } from '@vercel/blob';
+import { deleteCsvFileFromStorage } from '../src/lib/fileStorage';
 import prisma from '../src/lib/prisma';
 
 interface APIEvent {
@@ -47,17 +47,6 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       };
     }
 
-    const token = process.env.BLOB_READ_WRITE_TOKEN;
-    if (!token) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          error: 'BLOB_READ_WRITE_TOKEN belum dikonfigurasi',
-        }),
-      };
-    }
-
     // Get event name for folder structure
     let eventFolderName = eventId;
     if (eventId !== 'default') {
@@ -77,15 +66,8 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       }
     }
 
-    // Delete all blobs for this eventId folder and kind
-    const { blobs } = await list({
-      prefix: `events/${eventFolderName}/${kind}-`,
-      token,
-    });
-
-    await Promise.all(
-      blobs.map((blob) => del(blob.url, { token }))
-    );
+    // Delete CSV from local filesystem
+    await deleteCsvFileFromStorage(eventFolderName, kind as any);
 
     return {
       statusCode: 200,

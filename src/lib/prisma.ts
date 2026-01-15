@@ -7,11 +7,6 @@ import path from 'node:path';
 
 const { Pool } = pg;
 
-// Set Node environment to ignore self-signed certificates
-if (process.env.NODE_ENV !== 'production') {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-}
-
 const prismaClientSingleton = () => {
   const connectionString = process.env.DATABASE_URL;
 
@@ -19,19 +14,26 @@ const prismaClientSingleton = () => {
     throw new Error('DATABASE_URL environment variable is not set');
   }
 
-  const caPath = process.env.PGSQL_ATTR_SSL_CA || 'ca/ca.pem';
-  const absoluteCaPath = path.resolve(process.cwd(), caPath);
+  // Check if this is a local connection (localhost or 127.0.0.1)
+  const isLocalConnection = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
 
-  let poolConfig: any = {
+  const poolConfig: pg.PoolConfig = {
     connectionString,
-    ssl: {
-      rejectUnauthorized: false,
-    },
   };
 
-  if (fs.existsSync(absoluteCaPath)) {
-    const ca = fs.readFileSync(absoluteCaPath).toString();
-    poolConfig.ssl.ca = ca;
+  // Only use SSL for remote connections
+  if (!isLocalConnection) {
+    const caPath = process.env.PGSQL_ATTR_SSL_CA || 'ca/ca.pem';
+    const absoluteCaPath = path.resolve(process.cwd(), caPath);
+
+    poolConfig.ssl = {
+      rejectUnauthorized: false,
+    };
+
+    if (fs.existsSync(absoluteCaPath)) {
+      const ca = fs.readFileSync(absoluteCaPath).toString();
+      (poolConfig.ssl as any).ca = ca;
+    }
   }
 
   const pool = new Pool(poolConfig);
@@ -41,7 +43,7 @@ const prismaClientSingleton = () => {
 };
 
 declare global {
-  var prismaGlobal: undefined | ReturnType<typeof prismaClientSingleton>;
+  var prismaGlobal: undefined | PrismaClient;
 }
 
 const prisma = globalThis.prismaGlobal ?? prismaClientSingleton();

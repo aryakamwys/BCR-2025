@@ -1,4 +1,4 @@
-import { list } from '@vercel/blob';
+import { getCsvFileContent } from '../src/lib/fileStorage';
 import prisma from '../src/lib/prisma';
 
 interface APIEvent {
@@ -47,17 +47,6 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       };
     }
 
-    const token = process.env.BLOB_READ_WRITE_TOKEN;
-    if (!token) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          error: 'BLOB_READ_WRITE_TOKEN belum dikonfigurasi',
-        }),
-      };
-    }
-
     let eventFolderName = eventId;
     if (eventId !== 'default') {
       try {
@@ -76,17 +65,10 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       }
     }
 
-    // Use eventId prefix to separate CSV data per event (folder structure)
-    const { blobs } = await list({
-      prefix: `events/${eventFolderName}/${kind}-`,
-      token,
-    });
+    // Get CSV content from local filesystem
+    const result = await getCsvFileContent(eventFolderName, kind as any);
 
-    const latestBlob = blobs.sort(
-      (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-    )[0];
-
-    if (!latestBlob) {
+    if (!result) {
       const optionalKinds = ['start', 'checkpoint'];
       if (optionalKinds.includes(kind)) {
         return {
@@ -102,17 +84,14 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       };
     }
 
-    const response = await fetch(latestBlob.url);
-    const text = await response.text();
-
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        text,
-        filename: latestBlob.pathname,
-        url: latestBlob.url,
-        updatedAt: new Date(latestBlob.uploadedAt).getTime(),
+        text: result.text,
+        filename: result.meta.filename,
+        url: result.meta.url,
+        updatedAt: result.meta.updatedAt,
       }),
     };
   } catch (error: any) {

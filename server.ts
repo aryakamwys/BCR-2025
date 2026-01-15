@@ -8,10 +8,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
+
+// Get upload directory from environment or use default
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
 
 app.use(cors());
 
+// Parse raw body for multipart form data
 app.use((req, res, next) => {
   const contentType = req.headers['content-type'] || '';
   if (contentType.includes('multipart/form-data')) {
@@ -29,8 +33,13 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Serve static files from dist (frontend build)
 app.use(express.static(path.join(__dirname, 'dist')));
 
+// Serve uploaded files (CSV, images, etc.)
+app.use('/uploads', express.static(UPLOAD_DIR));
+
+// API handler
 const apiHandler = async (req: any, res: any) => {
   const url = new URL(req.originalUrl, `http://${req.headers.host}`);
   const pathname = url.pathname;
@@ -49,7 +58,7 @@ const apiHandler = async (req: any, res: any) => {
     }
 
     const contentType = req.headers['content-type'] || '';
-    let body = null;
+    let body: string | null = null;
     let isBase64Encoded = false;
 
     if (contentType.includes('multipart/form-data') && (req as any).rawBody) {
@@ -75,16 +84,20 @@ const apiHandler = async (req: any, res: any) => {
     });
     res.send(result.body);
   } catch (error: any) {
+    console.error('API Error:', error);
     res.status(500).json({ error: error.message || 'Internal server error', stack: error.stack });
   }
 };
 
 app.use('/api', apiHandler);
 
-app.use((req, res) => {
+// SPA fallback - serve index.html for all other routes
+app.use((_req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Upload directory: ${UPLOAD_DIR}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });

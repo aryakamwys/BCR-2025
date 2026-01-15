@@ -1,4 +1,4 @@
-import { list } from '@vercel/blob';
+import { listCsvMetadata } from '../src/lib/fileStorage';
 import prisma from '../src/lib/prisma';
 
 interface APIEvent {
@@ -36,17 +36,6 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
   try {
     const eventId = event.queryStringParameters?.eventId || 'default';
 
-    const token = process.env.BLOB_READ_WRITE_TOKEN;
-    if (!token) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          error: 'BLOB_READ_WRITE_TOKEN belum dikonfigurasi',
-        }),
-      };
-    }
-
     let eventFolderName = eventId;
     if (eventId !== 'default') {
       try {
@@ -65,42 +54,21 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       }
     }
 
-    const { blobs } = await list({
-      token,
-    });
+    // Get CSV metadata from local filesystem
+    const metaList = await listCsvMetadata(eventFolderName);
 
-    const csvKinds = ['master', 'start', 'finish', 'checkpoint'];
-    const meta: Array<{ key: string; filename: string; updatedAt: number; rows: number }> = [];
-
-    for (const kind of csvKinds) {
-      const kindBlobs = blobs
-        .filter((b) => b.pathname.startsWith(`events/${eventFolderName}/${kind}-`))
-        .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
-
-      if (kindBlobs.length > 0) {
-        const latest = kindBlobs[0];
-
-        const response = await fetch(latest.url);
-        const text = await response.text();
-        const rows = text.split('\n').filter((line) => line.trim().length > 0).length - 1;
-
-        const cleanFilename = latest.pathname
-          .replace(`events/${eventFolderName}/${kind}-`, '')
-          .replace(/^\d+-/, '');
-
-        meta.push({
-          key: kind,
-          filename: cleanFilename,
-          updatedAt: new Date(latest.uploadedAt).getTime(),
-          rows: Math.max(0, rows),
-        });
-      }
-    }
+    // Transform to expected format
+    const result = metaList.map(meta => ({
+      key: meta.kind,
+      filename: meta.filename,
+      updatedAt: meta.updatedAt,
+      rows: meta.rows,
+    }));
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(meta),
+      body: JSON.stringify(result),
     };
   } catch (error: any) {
     console.error('List CSV error:', error);

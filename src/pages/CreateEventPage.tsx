@@ -1,17 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { DEFAULT_CATEGORIES } from '../lib/config';
+
+interface FormData {
+  name: string;
+  description: string;
+  eventDate: string;
+  location: string;
+  latitude: string;
+  longitude: string;
+  isActive: boolean;
+  categories: string[];
+}
 
 export default function CreateEventPage() {
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
     eventDate: '',
     location: '',
+    latitude: '',
+    longitude: '',
     isActive: true,
-    categories: [...DEFAULT_CATEGORIES],
+    categories: [...DEFAULT_CATEGORIES] as string[],
   });
 
   const [newCategory, setNewCategory] = useState('');
@@ -68,12 +81,18 @@ export default function CreateEventPage() {
     setLoading(true);
 
     try {
+      const payload = {
+        ...formData,
+        latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+        longitude: formData.longitude ? parseFloat(formData.longitude) : null,
+      };
+
       const response = await fetch('/api/events', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -159,6 +178,36 @@ export default function CreateEventPage() {
                   onChange={handleChange}
                   placeholder="e.g., Jakarta, Indonesia"
                 />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="latitude">Latitude</label>
+                <input
+                  type="number"
+                  step="any"
+                  id="latitude"
+                  name="latitude"
+                  value={formData.latitude}
+                  onChange={handleChange}
+                  placeholder="e.g., -8.4095"
+                />
+                <small>Koordinat lintang untuk posisi marker di peta</small>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="longitude">Longitude</label>
+                <input
+                  type="number"
+                  step="any"
+                  id="longitude"
+                  name="longitude"
+                  value={formData.longitude}
+                  onChange={handleChange}
+                  placeholder="e.g., 115.1889"
+                />
+                <small>Koordinat bujur untuk posisi marker di peta</small>
               </div>
             </div>
 
@@ -343,6 +392,7 @@ export default function CreateEventPage() {
 
         input[type="text"],
         input[type="date"],
+        input[type="number"],
         textarea {
           width: 100%;
           padding: 0.75rem;
@@ -352,6 +402,13 @@ export default function CreateEventPage() {
           font-family: inherit;
           transition: border-color 0.2s;
           box-sizing: border-box;
+        }
+
+        .form-group small {
+          display: block;
+          margin-top: 0.25rem;
+          color: #6b7280;
+          font-size: 0.8rem;
         }
 
         input:focus,

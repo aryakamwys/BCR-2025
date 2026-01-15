@@ -106,6 +106,8 @@ export default function AdminPage({
   const [newEventName, setNewEventName] = useState('');
   const [newEventDate, setNewEventDate] = useState('');
   const [newEventLocation, setNewEventLocation] = useState('');
+  const [newEventLatitude, setNewEventLatitude] = useState('');
+  const [newEventLongitude, setNewEventLongitude] = useState('');
   const [newEventDescription, setNewEventDescription] = useState('');
   const [newEventActive, setNewEventActive] = useState(true);
 
@@ -369,6 +371,8 @@ export default function AdminPage({
           description: newEventDescription.trim(),
           eventDate: newEventDate,
           location: newEventLocation.trim(),
+          latitude: newEventLatitude.trim() ? parseFloat(newEventLatitude.trim()) : null,
+          longitude: newEventLongitude.trim() ? parseFloat(newEventLongitude.trim()) : null,
           isActive: newEventActive,
           categories: [...CATEGORY_KEYS],
         }),
@@ -385,6 +389,8 @@ export default function AdminPage({
       setNewEventName('');
       setNewEventDate('');
       setNewEventLocation('');
+      setNewEventLatitude('');
+      setNewEventLongitude('');
       setNewEventDescription('');
       setNewEventActive(true);
       setShowEventForm(false);
@@ -604,6 +610,30 @@ export default function AdminPage({
               />
             </div>
             <div style={{ marginBottom: "1rem" }}>
+              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                Coordinates (Optional)
+              </label>
+              <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "0.5rem" }}>
+                For accurate map placement, enter coordinates from Google Maps. Right-click on a location → "What's here?" to get coordinates.
+              </div>
+              <div style={{ display: "flex", gap: "1rem" }}>
+                <input
+                  className="search"
+                  style={{ flex: 1 }}
+                  placeholder="Latitude (e.g., -6.9732083)"
+                  value={newEventLatitude}
+                  onChange={(e) => setNewEventLatitude(e.target.value)}
+                />
+                <input
+                  className="search"
+                  style={{ flex: 1 }}
+                  placeholder="Longitude (e.g., 107.6308535)"
+                  value={newEventLongitude}
+                  onChange={(e) => setNewEventLongitude(e.target.value)}
+                />
+              </div>
+            </div>
+            <div style={{ marginBottom: "1rem" }}>
               <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>Description</label>
               <textarea
                 className="search"
@@ -632,6 +662,8 @@ export default function AdminPage({
                 setNewEventName("");
                 setNewEventDate("");
                 setNewEventLocation("");
+                setNewEventLatitude("");
+                setNewEventLongitude("");
                 setNewEventDescription("");
                 setNewEventActive(true);
               }}>

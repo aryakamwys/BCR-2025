@@ -99,81 +99,91 @@ export default function UserEventPage() {
             <div className="relative">
               <div className="overflow-hidden">
                 <div
-                  className="flex transition-transform duration-500 ease-in-out"
+                  className="flex transition-transform duration-500 ease-in-out gap-6"
                   style={{ transform: `translateX(-${currentIndex * (100 / 3)}%)` }}
                 >
                   {events.map((event) => (
                     <div
                       key={event.id}
-                      className="w-1/3 flex-shrink-0 px-2"
+                      className="w-1/3 flex-shrink-0"
                     >
                       <div
-                        className="bg-white rounded-lg shadow-xl hover:shadow-2xl transition-all duration-300 border border-gray-200 overflow-hidden cursor-pointer flex flex-col"
+                        className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 overflow-hidden cursor-pointer flex flex-col h-full"
                         onClick={() => handleEventClick(event)}
                       >
-                        {/* Event Header */}
-                        <div className="h-28 bg-gradient-to-br from-red-500 to-red-600 relative overflow-hidden flex-shrink-0">
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="text-white text-center px-4">
-                              <h3 className="text-lg font-bold mb-1 drop-shadow-lg line-clamp-1">{event.name}</h3>
+                        {/* Event Header with Gradient */}
+                        <div className="h-36 bg-gradient-to-br from-red-500 via-red-600 to-red-700 relative overflow-hidden flex-shrink-0">
+                          {/* Decorative circles */}
+                          <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full"></div>
+                          <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white/5 rounded-full"></div>
+                          
+                          <div className="absolute inset-0 flex items-center justify-center p-4">
+                            <div className="text-white text-center">
+                              <h3 className="text-xl font-bold mb-2 drop-shadow-lg line-clamp-2 leading-tight">{event.name}</h3>
                               {event.location && (
-                                <p className="text-xs text-red-50 drop-shadow-md line-clamp-1">{event.location}</p>
+                                <div className="flex items-center justify-center gap-1 text-red-100">
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                  </svg>
+                                  <span className="text-sm font-medium line-clamp-1">{event.location}</span>
+                                </div>
                               )}
                             </div>
                           </div>
+                          
                           {/* Status Badge */}
-                          <div className="absolute top-2 right-2">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          <div className="absolute top-3 left-3">
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-md ${
                               event.status === 'ongoing'
                                 ? 'bg-green-500 text-white'
                                 : event.status === 'completed'
                                 ? 'bg-gray-500 text-white'
-                                : 'bg-yellow-500 text-white'
+                                : 'bg-yellow-400 text-yellow-900'
                             }`}>
-                              {event.status === 'ongoing' ? 'ONGOING' : event.status === 'completed' ? 'COMPLETED' : 'UPCOMING'}
+                              {event.status === 'ongoing' ? 'LIVE' : event.status === 'completed' ? 'SELESAI' : 'SEGERA'}
                             </span>
                           </div>
                         </div>
 
                         {/* Event Details */}
-                        <div className="p-4 flex flex-col flex-1">
-                          {/* Description - Fixed height */}
-                          <div className="mb-3 h-[72px] flex-shrink-0 overflow-hidden">
+                        <div className="p-5 flex flex-col flex-1">
+                          {/* Description */}
+                          <div className="mb-4 min-h-[60px]">
                             {event.description ? (
-                              <p className="text-gray-600 text-xs leading-relaxed line-clamp-4">
+                              <p className="text-gray-600 text-sm leading-relaxed line-clamp-3">
                                 {event.description}
                               </p>
                             ) : (
-                              <p className="text-gray-400 text-xs leading-relaxed italic">
-                                No description available
+                              <p className="text-gray-400 text-sm leading-relaxed italic">
+                                Deskripsi belum tersedia
                               </p>
                             )}
                           </div>
 
-                          {/* Categories - Auto height but with max */}
-                          <div className="mb-3 flex-shrink-0">
+                          {/* Divider */}
+                          <div className="border-t border-gray-100 my-3"></div>
+
+                          {/* Categories */}
+                          <div className="mb-4 flex-1">
+                            <p className="text-xs text-gray-500 font-medium mb-2 uppercase tracking-wide">Kategori</p>
                             {event.categories && event.categories.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {event.categories.slice(0, 4).map((cat) => (
+                              <div className="flex flex-wrap gap-2">
+                                {event.categories.slice(0, 3).map((cat) => (
                                   <span
                                     key={`${event.id}-${cat}`}
-                                    className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                                    className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-xs font-semibold border border-red-100"
                                   >
                                     {cat}
                                   </span>
                                 ))}
-                                {event.categories.length > 4 && (
-                                  <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded-full text-[10px] font-semibold">
-                                    +{event.categories.length - 4}
+                                {event.categories.length > 3 && (
+                                  <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-semibold">
+                                    +{event.categories.length - 3} lainnya
                                   </span>
                                 )}
                               </div>
                             ) : (
-                              <div className="flex flex-wrap gap-1">
-                                <span className="px-2 py-0.5 bg-gray-200 text-gray-500 rounded-full text-[10px] font-semibold italic">
-                                  No categories
-                                </span>
-                              </div>
+                              <span className="text-gray-400 text-xs italic">Tidak ada kategori</span>
                             )}
                           </div>
 
@@ -183,9 +193,9 @@ export default function UserEventPage() {
                               e.stopPropagation();
                               handleViewLeaderboard(event.slug);
                             }}
-                            className="w-full bg-white text-accent border-2 border-red-600 px-3 py-2 rounded-lg font-bold text-xs hover:bg-red-600 hover:text-white transition-all duration-300 shadow-md hover:shadow-lg flex-shrink-0"
+                            className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white px-4 py-3 rounded-xl font-bold text-sm hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                           >
-                            View Details
+                            Lihat Detail
                           </button>
                         </div>
                       </div>

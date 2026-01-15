@@ -135,7 +135,7 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
         ? JSON.parse(Buffer.from(event.body, 'base64').toString())
         : JSON.parse(event.body);
 
-      const { name, description, eventDate, location, isActive, categories } = body;
+      const { name, description, eventDate, location, latitude, longitude, isActive, categories } = body;
 
       if (!name || !eventDate) {
         return {
@@ -145,17 +145,18 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
         };
       }
 
-      // Geocode location to get coordinates
-      let latitude = null;
-      let longitude = null;
+      // Use manual coordinates if provided, otherwise geocode from location
+      let finalLatitude = latitude !== null && latitude !== undefined && latitude !== '' ? parseFloat(latitude) : null;
+      let finalLongitude = longitude !== null && longitude !== undefined && longitude !== '' ? parseFloat(longitude) : null;
 
-      if (location && location.trim().length > 0) {
+      // Only geocode if coordinates not provided manually and location exists
+      if ((finalLatitude === null || finalLongitude === null) && location && location.trim().length > 0) {
         try {
           const { geocodeLocation } = await import('../src/lib/geocoding');
           const coords = await geocodeLocation(location);
           if (coords) {
-            latitude = coords.latitude;
-            longitude = coords.longitude;
+            finalLatitude = finalLatitude ?? coords.latitude;
+            finalLongitude = finalLongitude ?? coords.longitude;
           }
         } catch (error) {
           console.error('Geocoding failed for location:', location, error);
@@ -192,8 +193,8 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
           description,
           eventDate: new Date(eventDate),
           location,
-          latitude,
-          longitude,
+          latitude: finalLatitude,
+          longitude: finalLongitude,
           isActive: isActive !== undefined ? isActive : true,
           categories: {
             create: defaultCategories.map((name: string, order: number) => ({
@@ -239,13 +240,22 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
         ? JSON.parse(Buffer.from(event.body, 'base64').toString())
         : JSON.parse(event.body);
 
-      const { name, description, eventDate, location, isActive } = body;
+      const { name, description, eventDate, location, latitude, longitude, isActive } = body;
 
-      // If location is being updated, re-geocode to get new coordinates
-      let latitude = undefined;
-      let longitude = undefined;
+      // Handle coordinates - use manual if provided
+      let finalLatitude = undefined;
+      let finalLongitude = undefined;
 
-      if (location !== undefined) {
+      // Check if manual coordinates provided
+      if (latitude !== undefined) {
+        finalLatitude = latitude !== null && latitude !== '' ? parseFloat(latitude) : null;
+      }
+      if (longitude !== undefined) {
+        finalLongitude = longitude !== null && longitude !== '' ? parseFloat(longitude) : null;
+      }
+
+      // If location is being updated and no manual coordinates, re-geocode
+      if (location !== undefined && finalLatitude === undefined && finalLongitude === undefined) {
         // Get current event to check if location changed
         const currentEvent = await prisma.event.findUnique({
           where: { id: eventId },
@@ -259,8 +269,8 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
               const { geocodeLocation } = await import('../src/lib/geocoding');
               const coords = await geocodeLocation(location);
               if (coords) {
-                latitude = coords.latitude;
-                longitude = coords.longitude;
+                finalLatitude = coords.latitude;
+                finalLongitude = coords.longitude;
               }
             } catch (error) {
               console.error('Geocoding failed for location:', location, error);
@@ -268,8 +278,8 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
             }
           } else {
             // Location cleared, remove coordinates
-            latitude = null;
-            longitude = null;
+            finalLatitude = null;
+            finalLongitude = null;
           }
         }
       }
@@ -281,8 +291,8 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
           ...(description !== undefined && { description }),
           ...(eventDate && { eventDate: new Date(eventDate) }),
           ...(location !== undefined && { location }),
-          ...(latitude !== undefined && { latitude }),
-          ...(longitude !== undefined && { longitude }),
+          ...(finalLatitude !== undefined && { latitude: finalLatitude }),
+          ...(finalLongitude !== undefined && { longitude: finalLongitude }),
           ...(isActive !== undefined && { isActive }),
         },
         include: {

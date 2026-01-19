@@ -43,11 +43,15 @@ COPY tsconfig.server.json ./
 # Generate Prisma client
 RUN npx prisma generate
 
+# Copy entrypoint script
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
 # Set default port (Railways will override this with PORT env var)
 ENV PORT=3001
 
 # Expose port
 EXPOSE 3001
 
-# Start the server
-CMD ["npx", "tsx", "server.ts"]
+# Start with entrypoint (runs migrations then server)
+ENTRYPOINT ["./docker-entrypoint.sh"]

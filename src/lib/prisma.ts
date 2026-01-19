@@ -14,8 +14,12 @@ const prismaClientSingleton = () => {
     throw new Error('DATABASE_URL environment variable is not set');
   }
 
-  // Check if this is a local connection (localhost or 127.0.0.1)
-  const isLocalConnection = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
+  // cek koneksi local
+  const isLocalConnection = 
+    connectionString.includes('localhost') || 
+    connectionString.includes('127.0.0.1') ||
+    connectionString.includes('@postgres:') ||  // Docker service name
+    process.env.DISABLE_SSL === 'true';
 
   const poolConfig: pg.PoolConfig = {
     connectionString,

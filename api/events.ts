@@ -23,6 +23,8 @@ export interface Event {
   location?: string;
   latitude?: number;
   longitude?: number;
+  status?: string;
+  gpxFile?: string;
   isActive: boolean;
   createdAt: number;
   categories: string[];
@@ -38,6 +40,8 @@ function formatEvent(event: any): Event {
     location: event.location || '',
     latitude: event.latitude || undefined,
     longitude: event.longitude || undefined,
+    status: event.status || 'upcoming',
+    gpxFile: event.gpxFile || undefined,
     isActive: event.isActive,
     categories: event.categories.map((c: any) => c.name),
     createdAt: event.createdAt.getTime(),
@@ -240,7 +244,7 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
         ? JSON.parse(Buffer.from(event.body, 'base64').toString())
         : JSON.parse(event.body);
 
-      const { name, description, eventDate, location, latitude, longitude, isActive } = body;
+      const { name, description, eventDate, location, latitude, longitude, isActive, status, gpxFile } = body;
 
       // Handle coordinates - use manual if provided
       let finalLatitude = undefined;
@@ -294,6 +298,8 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
           ...(finalLatitude !== undefined && { latitude: finalLatitude }),
           ...(finalLongitude !== undefined && { longitude: finalLongitude }),
           ...(isActive !== undefined && { isActive }),
+          ...(status !== undefined && { status }),
+          ...(gpxFile !== undefined && { gpxFile }),
         },
         include: {
           categories: {

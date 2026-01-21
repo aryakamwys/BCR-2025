@@ -95,16 +95,26 @@ export async function fetchCsvMeta(
 
 export async function fetchAllCsvMeta(eventId: string): Promise<StoredCsvMeta[]> {
   try {
-    const response = await fetch(`/api/csv-list?eventId=${encodeURIComponent(eventId)}`, {
+    // Add cache-busting timestamp
+    const timestamp = Date.now();
+    const response = await fetch(`/api/csv-list?eventId=${encodeURIComponent(eventId)}&_t=${timestamp}`, {
       cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      },
     });
 
     if (!response.ok) {
+      console.error('[fetchAllCsvMeta] Response not OK:', response.status);
       return [];
     }
 
-    return await response.json() as StoredCsvMeta[];
-  } catch {
+    const data = await response.json() as StoredCsvMeta[];
+    console.log('[fetchAllCsvMeta] Loaded meta for', eventId, ':', data);
+    return data;
+  } catch (error) {
+    console.error('[fetchAllCsvMeta] Error:', error);
     return [];
   }
 }
@@ -140,11 +150,15 @@ export async function uploadCsvViaApi(
 
 export async function uploadBannerViaApi(
   eventId: string,
-  file: File
+  file: File,
+  alt?: string,
+  order?: number
 ): Promise<{ path: string; url: string }> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('eventId', eventId);
+  if (alt) formData.append('alt', alt);
+  if (order !== undefined) formData.append('order', String(order));
 
   const response = await fetch('/api/banner-upload', {
     method: 'POST',

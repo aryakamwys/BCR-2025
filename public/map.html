@@ -16,6 +16,11 @@
       height: 100%;
       overflow: hidden;
     }
+
+    /* Hide attribution text */
+    .leaflet-control-attribution {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
@@ -85,7 +90,7 @@
               (event.location ? '<p style="font-size: 13px; margin: 0 0 8px 0; color: #6b7280;">📍 ' + event.location + '</p>' : '') +
               (event.description ? '<p style="font-size: 13px; margin: 0 0 12px 0; color: #374151;">' + event.description + '</p>' : '') +
               '<div style="display: flex; gap: 8px;">' +
-                '<a href="/event/' + event.slug + '" style="flex: 1; background-color: #FF383C; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; text-align: center; display: block;">View Details</a>' +
+                '<a href="/event/' + event.slug + '" style="flex: 1; background-color: #FF383C; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; text-align: center; display: block;">View Leaderboard</a>' +
                 '<a href="https://www.google.com/maps/dir/?api=1&destination=' + event.latitude + ',' + event.longitude + '" target="_blank" style="flex: 1; background-color: #f3f4f6; color: #374151; border: none; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; text-align: center; display: block;">Directions</a>' +
               '</div>' +
             '</div>';

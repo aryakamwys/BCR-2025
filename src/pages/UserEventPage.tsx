@@ -286,7 +286,7 @@ export default function UserEventPage() {
                   <div className="mb-6">
                     <h3 className="text-lg font-bold text-gray-800 mb-2">Categories</h3>
                     <div className="flex flex-wrap gap-2">
-                      {selectedEvent.categories.map((cat, idx) => (
+                      {selectedEvent.categories.map((cat) => (
                         <span
                           key={`${selectedEvent.id}-modal-${cat}`}
                           className="px-4 py-2 bg-red-100 text-red-700 rounded-full text-sm font-semibold"

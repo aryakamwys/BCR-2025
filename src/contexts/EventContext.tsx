@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 interface Event {
   id: string;
@@ -10,6 +10,9 @@ interface Event {
   latitude?: number;
   longitude?: number;
   isActive: boolean;
+  categories?: string[];
+  gpxFile?: string;
+  status?: string;
 }
 
 interface EventContextType {
@@ -18,6 +21,7 @@ interface EventContextType {
   events: Event[];
   setEvents: (events: Event[]) => void;
   refreshEvents: () => Promise<void>;
+  loading: boolean;
 }
 
 const EventContext = createContext<EventContextType | undefined>(undefined);
@@ -25,14 +29,17 @@ const EventContext = createContext<EventContextType | undefined>(undefined);
 export function EventProvider({ children }: { children: ReactNode }) {
   const [currentEvent, setCurrentEvent] = useState<Event | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const refreshEvents = async () => {
+    setLoading(true);
     try {
       const response = await fetch('/api/events');
       if (!response.ok) throw new Error('Failed to fetch events');
 
       const data = await response.json();
-      const activeEvents = data.events || [];
+      // API returns events array directly, not wrapped in an object
+      const activeEvents = Array.isArray(data) ? data : (data.events || []);
 
       setEvents(activeEvents);
 
@@ -49,6 +56,9 @@ export function EventProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (error) {
+      console.error('Failed to fetch events:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -57,7 +67,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <EventContext.Provider value={{ currentEvent, setCurrentEvent, events, setEvents, refreshEvents }}>
+    <EventContext.Provider value={{ currentEvent, setCurrentEvent, events, setEvents, refreshEvents, loading }}>
       {children}
     </EventContext.Provider>
   );

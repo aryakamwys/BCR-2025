@@ -5,7 +5,7 @@
     "path": "/app/uploads/events/default/csv/master.csv",
     "url": "http://localhost:3001/uploads/events/default/csv/master.csv",
     "rows": 1830,
-    "updatedAt": 1768861350425
+    "updatedAt": 1768917353607
   },
   "finish": {
     "kind": "finish",
@@ -13,7 +13,7 @@
     "path": "/app/uploads/events/default/csv/finish.csv",
     "url": "http://localhost:3001/uploads/events/default/csv/finish.csv",
     "rows": 1684,
-    "updatedAt": 1768861356282
+    "updatedAt": 1768917364095
   },
   "checkpoint": {
     "kind": "checkpoint",
@@ -21,6 +21,6 @@
     "path": "/app/uploads/events/default/csv/checkpoint.csv",
     "url": "http://localhost:3001/uploads/events/default/csv/checkpoint.csv",
     "rows": 1684,
-    "updatedAt": 1768861360947
+    "updatedAt": 1768917369657
   }
 }

@@ -1,5 +1,4 @@
 import { getCsvFileContent } from '../src/lib/fileStorage';
-import prisma from '../src/lib/prisma';
 
 interface APIEvent {
   httpMethod: string;
@@ -47,23 +46,8 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
       };
     }
 
-    let eventFolderName = eventId;
-    if (eventId !== 'default') {
-      try {
-        const eventRecord = await prisma.event.findUnique({
-          where: { id: eventId },
-          select: { name: true },
-        });
-        if (eventRecord?.name) {
-          eventFolderName = eventRecord.name
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-|-$/g, '');
-        }
-      } catch {
-        eventFolderName = eventId;
-      }
-    }
+    // Use eventId directly as folder name for consistency
+    const eventFolderName = eventId;
 
     // Get CSV content from local filesystem
     const result = await getCsvFileContent(eventFolderName, kind as any);

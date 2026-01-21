@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { exportLeaderboardCSV } from "../lib/csv";
 
 export type LeaderRow = {
@@ -106,7 +106,7 @@ export default function LeaderboardTable({
                   ].join(" ")}
                 >
                   <td className="pos-cell">
-                    <span className={`pos-pill pos-${pos <= 3 ? pos : "n"}`}>
+                    <span className={`pos-pill pos-${r.rank != null && r.rank <= 3 ? r.rank : "n"}`}>
                       {pos}
                     </span>
                   </td>

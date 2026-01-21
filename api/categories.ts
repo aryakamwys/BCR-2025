@@ -33,16 +33,7 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
 
   try {
     const eventId = event.queryStringParameters?.eventId;
-
-    if (!eventId) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'eventId is required' }),
-      };
-    }
-
-    const isDefault = eventId === 'default';
+    const isDefault = !eventId || eventId === 'default';
 
     if (event.httpMethod === 'GET') {
       if (isDefault) {

@@ -1,5 +1,6 @@
 import { listCsvMetadata } from '../src/lib/fileStorage';
-import prisma from '../src/lib/prisma';
+import path from 'node:path';
+import fs from 'node:fs';
 
 interface APIEvent {
   httpMethod: string;
@@ -36,26 +37,23 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
   try {
     const eventId = event.queryStringParameters?.eventId || 'default';
 
-    let eventFolderName = eventId;
-    if (eventId !== 'default') {
-      try {
-        const eventRecord = await prisma.event.findUnique({
-          where: { id: eventId },
-          select: { name: true },
-        });
-        if (eventRecord?.name) {
-          eventFolderName = eventRecord.name
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-|-$/g, '');
-        }
-      } catch {
-        eventFolderName = eventId;
-      }
-    }
+    // Use eventId directly as folder name for consistency
+    const eventFolderName = eventId;
+
+    // Debug: log paths
+    const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
+    const csvDir = path.join(uploadDir, 'events', eventFolderName, 'csv');
+    const metaPath = path.join(csvDir, '_meta.json');
+    
+    console.log('[csv-list] eventId:', eventId);
+    console.log('[csv-list] uploadDir:', uploadDir);
+    console.log('[csv-list] csvDir:', csvDir);
+    console.log('[csv-list] metaPath:', metaPath);
+    console.log('[csv-list] metaPath exists:', fs.existsSync(metaPath));
 
     // Get CSV metadata from local filesystem
     const metaList = await listCsvMetadata(eventFolderName);
+    console.log('[csv-list] metaList:', metaList);
 
     // Transform to expected format
     const result = metaList.map(meta => ({

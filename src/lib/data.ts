@@ -76,8 +76,15 @@ export type MasterParticipant = {
   sourceCategoryKey: CategoryKey;
 };
 
-async function requireCsvText(kind: "master" | "finish",eventId: string = 'default'): Promise<string> {
-  const file = await getCsvFile(kind, eventId);
+async function requireCsvText(kind: "master" | "finish", eventId: string = 'default'): Promise<string> {
+  // Try event-specific folder first
+  let file = await getCsvFile(kind, eventId);
+  
+  // Fallback to default folder if not found and eventId is not already default
+  if (!file?.text && eventId !== 'default') {
+    console.log(`[data] CSV '${kind}' not found for event '${eventId}', trying default folder`);
+    file = await getCsvFile(kind, 'default');
+  }
 
   if (!file?.text) {
     throw new Error(
@@ -87,8 +94,16 @@ async function requireCsvText(kind: "master" | "finish",eventId: string = 'defau
   return file.text;
 }
 
-async function getCsvTextOptional(kind: "start" | "checkpoint",eventId: string = 'default'): Promise<string | null> {
-  const file = await getCsvFile(kind, eventId);
+async function getCsvTextOptional(kind: "start" | "checkpoint", eventId: string = 'default'): Promise<string | null> {
+  // Try event-specific folder first
+  let file = await getCsvFile(kind, eventId);
+  
+  // Fallback to default folder if not found and eventId is not already default
+  if (!file?.text && eventId !== 'default') {
+    console.log(`[data] CSV '${kind}' not found for event '${eventId}', trying default folder`);
+    file = await getCsvFile(kind, 'default');
+  }
+  
   return file?.text || null;
 }
 
@@ -212,7 +227,15 @@ export async function loadTimesMap(kind: "start" | "finish",eventId: string = 'd
 }
 
 export async function loadCheckpointTimesMap(eventId: string = 'default'): Promise<Map<string, string[]>> {
-  const file = await getCsvFile("checkpoint", eventId);
+  // Try event-specific folder first
+  let file = await getCsvFile("checkpoint", eventId);
+  
+  // Fallback to default folder if not found and eventId is not already default
+  if (!file?.text && eventId !== 'default') {
+    console.log(`[data] CSV 'checkpoint' not found for event '${eventId}', trying default folder`);
+    file = await getCsvFile("checkpoint", 'default');
+  }
+  
   if (!file?.text) return new Map();
 
   const grid = parseCsv(file.text);

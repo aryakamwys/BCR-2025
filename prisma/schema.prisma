@@ -15,6 +15,8 @@ model Event {
   location    String?
   latitude    Float?
   longitude   Float?
+  gpxFile     String?    // Path to GPX route file
+  status      String     @default("upcoming") // upcoming, ongoing, completed
   isActive    Boolean    @default(true)
   categories  Category[]
   banners     Banner[]

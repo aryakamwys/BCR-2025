@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import LeaderboardTable, { LeaderRow } from "./LeaderboardTable";
 import { exportLeaderboardCSV } from "../lib/csv";
 

@@ -3,8 +3,7 @@ import {
   fetchCsvContent, 
   fetchAllCsvMeta,
   uploadCsvViaApi,
-  deleteCsvViaApi,
-  type StoredCsvMeta 
+  deleteCsvViaApi
 } from "./storage";
 
 type StoredFile = {

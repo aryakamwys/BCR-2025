@@ -1,35 +1,52 @@
-// src/pages/EventPage.tsx
+// src/pages/EventPage.tsx - User facing event detail page
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import RaceClock from "../components/RaceClock";
 import CategorySection from "../components/CategorySection";
 import LeaderboardTable, { LeaderRow } from "../components/LeaderboardTable";
 import ParticipantModal from "../components/ParticipantModal";
-import AdminPage from "../components/AdminPage";
 import Navbar from "../components/Navbar";
 import {
   loadMasterParticipants,
   loadTimesMap,
   loadCheckpointTimesMap,
 } from "../lib/data";
-import { DEFAULT_EVENT_TITLE, LS_EVENT_TITLE, LS_DATA_VERSION, getCategoriesForEvent } from "../lib/config";
+import { LS_DATA_VERSION } from "../lib/config";
 import parseTimeToMs, { extractTimeOfDay, formatDuration } from "../lib/time";
 
 const LS_CUTOFF = "imr_cutoff_ms";
 const LS_DQ = "imr_dq_map";
 const LS_CAT_START = "imr_cat_start_raw";
 
+interface EventData {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  eventDate: string;
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  gpxFile?: string;
+  categories: string[];
+  isActive: boolean;
+}
+
+interface Banner {
+  id: string;
+  imageUrl: string;
+  alt?: string;
+  order: number;
+  isActive: boolean;
+}
+
 function loadCutoffMs(): number | null {
   const v = localStorage.getItem(LS_CUTOFF);
   if (!v) return null;
   const n = Number(v);
   if (!Number.isFinite(n) || n <= 0) return null;
-
-  // kalau kecil (<=48) dianggap jam → konversi ke ms
   if (n <= 48) return n * 3600000;
-
-  // kalau sudah besar, anggap sudah ms
   return n;
 }
 
@@ -40,6 +57,7 @@ function loadDQMap(): Record<string, boolean> {
     return {};
   }
 }
+
 function loadCatStartRaw(): Record<string, string> {
   try {
     return JSON.parse(localStorage.getItem(LS_CAT_START) || "{}");
@@ -55,85 +73,138 @@ type LoadState =
 
 export default function EventPage() {
   const { slug } = useParams<{ slug: string }>();
-  const [eventId, setEventId] = useState<string | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
-
-  const [eventTitle, setEventTitle] = useState<string>(() => {
-    return localStorage.getItem(LS_EVENT_TITLE) || DEFAULT_EVENT_TITLE;
-  });
-
+  const [event, setEvent] = useState<EventData | null>(null);
+  const [banners, setBanners] = useState<Banner[]>([]);
   const [state, setState] = useState<LoadState>({
     status: "loading",
-    msg: "Memuat data CSV…",
+    msg: "Memuat data event...",
   });
 
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-
   const [overall, setOverall] = useState<LeaderRow[]>([]);
   const [byCategory, setByCategory] = useState<Record<string, LeaderRow[]>>({});
-  const [activeTab, setActiveTab] = useState<string>("Overall");
-  const [checkpointMap, setCheckpointMap] = useState<Map<string, string[]>>(
-    new Map()
-  );
-
+  const [activeTab, setActiveTab] = useState<string>("Participants");
+  const [checkpointMap, setCheckpointMap] = useState<Map<string, string[]>>(new Map());
   const [selected, setSelected] = useState<LeaderRow | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-
   const [recalcTick, setRecalcTick] = useState(0);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const [gpxTrackPoints, setGpxTrackPoints] = useState<Array<[number, number]>>([]);
 
-  // Load event info and categories
+  // Load event info
   useEffect(() => {
     if (!slug) return;
 
     (async () => {
       try {
-        // Load events to find matching event ID
-        const response = await fetch('/api/events');
+        const response = await fetch(`/api/events?eventId=${slug}`);
         if (response.ok) {
-          const events = await response.json();
-          const event = events.find((e: any) => e.slug === slug);
-          if (event) {
-            setEventId(event.id);
-            setEventTitle(event.name);
-            setCategories(event.categories || []);
-            setSettingsLoaded(true);
-          }
+          const eventData = await response.json();
+          setEvent(eventData);
+        } else {
+          setState({ status: "error", msg: "Event tidak ditemukan" });
         }
       } catch (error) {
-        setSettingsLoaded(true);
+        setState({ status: "error", msg: "Gagal memuat data event" });
       }
     })();
   }, [slug]);
 
+  // Load banners
   useEffect(() => {
-    setSettingsLoaded(true);
-  }, [eventId]);
+    if (!event?.id) return;
 
+    (async () => {
+      try {
+        const response = await fetch(`/api/banners?eventId=${event.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          const activeBanners = (Array.isArray(data) ? data : [])
+            .filter((b: Banner) => b.isActive)
+            .sort((a: Banner, b: Banner) => a.order - b.order);
+          setBanners(activeBanners);
+        }
+      } catch (error) {
+        console.error('Failed to load banners:', error);
+      }
+    })();
+  }, [event?.id]);
+
+  // Banner auto-rotate
   useEffect(() => {
-    if (!settingsLoaded || !eventId) return;
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentBannerIndex((prev) => (prev + 1) % banners.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [banners.length]);
+
+  // Load GPX data
+  useEffect(() => {
+    if (!event?.gpxFile) {
+      setGpxTrackPoints([]);
+      return;
+    }
+
+    const gpxUrl = event.gpxFile;
+
+    (async () => {
+      try {
+        const response = await fetch(gpxUrl);
+        if (!response.ok) {
+          console.error('Failed to load GPX file');
+          return;
+        }
+        
+        const gpxText = await response.text();
+        const parser = new DOMParser();
+        const gpxDoc = parser.parseFromString(gpxText, 'text/xml');
+        
+        // Parse track points
+        const trackPoints: Array<[number, number]> = [];
+        const trkpts = gpxDoc.querySelectorAll('trkpt');
+        
+        trkpts.forEach((pt) => {
+          const lat = parseFloat(pt.getAttribute('lat') || '0');
+          const lon = parseFloat(pt.getAttribute('lon') || '0');
+          if (lat && lon) {
+            trackPoints.push([lat, lon]);
+          }
+        });
+        
+        // Also check for route points (rtept)
+        if (trackPoints.length === 0) {
+          const rtepts = gpxDoc.querySelectorAll('rtept');
+          rtepts.forEach((pt) => {
+            const lat = parseFloat(pt.getAttribute('lat') || '0');
+            const lon = parseFloat(pt.getAttribute('lon') || '0');
+            if (lat && lon) {
+              trackPoints.push([lat, lon]);
+            }
+          });
+        }
+        
+        setGpxTrackPoints(trackPoints);
+      } catch (error) {
+        console.error('Error parsing GPX:', error);
+      }
+    })();
+  }, [event?.gpxFile]);
+
+  // Load race data (participants, results)
+  useEffect(() => {
+    if (!event?.id) return;
 
     (async () => {
       try {
         if (!hasLoadedOnce) {
-          setState({
-            status: "loading",
-            msg: "Load master peserta (CSV)…",
-          });
+          setState({ status: "loading", msg: "Load data peserta..." });
         }
 
-        const master = await loadMasterParticipants(eventId);
-
-        if (!hasLoadedOnce) {
-          setState({
-            status: "loading",
-            msg: "Load start, finish, checkpoint (CSV)…",
-          });
-        }
-
-        const startMap = await loadTimesMap("start", eventId);
-        const finishMap = await loadTimesMap("finish", eventId);
-        const cpMap = await loadCheckpointTimesMap(eventId);
+        const master = await loadMasterParticipants(event.id);
+        const startMap = await loadTimesMap("start", event.id);
+        const finishMap = await loadTimesMap("finish", event.id);
+        const cpMap = await loadCheckpointTimesMap(event.id);
         setCheckpointMap(cpMap);
 
         const cutoffMs = loadCutoffMs();
@@ -160,30 +231,15 @@ export default function EventPage() {
           }
         });
 
-        function buildOverrideFromFinishDate(
-          finishMs: number,
-          timeStr: string
-        ): number | null {
-          const m = timeStr.match(
-            /(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.(\d{1,3}))?/
-          );
+        function buildOverrideFromFinishDate(finishMs: number, timeStr: string): number | null {
+          const m = timeStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.(\d{1,3}))?/);
           if (!m) return null;
-
           const h = Number(m[1] || 0);
           const mi = Number(m[2] || 0);
           const se = Number(m[3] || 0);
           const ms = m[4] ? Number(String(m[4]).padEnd(3, "0").slice(0, 3)) : 0;
-
           const d = new Date(finishMs);
-          const override = new Date(
-            d.getFullYear(),
-            d.getMonth(),
-            d.getDate(),
-            h,
-            mi,
-            se,
-            ms
-          );
+          const override = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, mi, se, ms);
           return override.getTime();
         }
 
@@ -209,10 +265,7 @@ export default function EventPage() {
               total = finishEntry.ms - startEntry.ms;
             }
           } else if (timeOnly) {
-            const builtOverride = buildOverrideFromFinishDate(
-              finishEntry.ms,
-              timeOnly
-            );
+            const builtOverride = buildOverrideFromFinishDate(finishEntry.ms, timeOnly);
             if (builtOverride != null) {
               const delta = finishEntry.ms - builtOverride;
               if (Number.isFinite(delta) && delta >= 0) {
@@ -247,11 +300,7 @@ export default function EventPage() {
             sourceCategoryKey: p.sourceCategoryKey,
             finishTimeRaw: extractTimeOfDay(finishEntry.raw),
             totalTimeMs: total,
-            totalTimeDisplay: isDQ
-              ? "DSQ"
-              : isDNF
-              ? "DNF"
-              : formatDuration(total),
+            totalTimeDisplay: isDQ ? "DSQ" : isDNF ? "DNF" : formatDuration(total),
             epc: p.epc,
           });
         });
@@ -264,23 +313,16 @@ export default function EventPage() {
           .sort((a, b) => a.totalTimeMs - b.totalTimeMs)
           .map((r, i) => ({ ...r, rank: i + 1 }));
 
-        const finisherRankByEpc = new Map(
-          finisherSorted.map((r) => [r.epc, r.rank!])
-        );
-
+        const finisherRankByEpc = new Map(finisherSorted.map((r) => [r.epc, r.rank!]));
         const genderRankByEpc = new Map<string, number>();
-        const genders = Array.from(
-          new Set(finisherSorted.map((r) => (r.gender || "").toLowerCase()))
-        );
+        const genders = Array.from(new Set(finisherSorted.map((r) => (r.gender || "").toLowerCase())));
         genders.forEach((g) => {
-          const list = finisherSorted.filter(
-            (r) => (r.gender || "").toLowerCase() === g
-          );
+          const list = finisherSorted.filter((r) => (r.gender || "").toLowerCase() === g);
           list.forEach((r, i) => genderRankByEpc.set(r.epc, i + 1));
         });
 
         const categoryRankByEpc = new Map<string, number>();
-        categories.forEach((catKey) => {
+        (event.categories || []).forEach((catKey) => {
           const list = finisherSorted.filter((r) => r.sourceCategoryKey === catKey);
           list.forEach((r, i) => categoryRankByEpc.set(r.epc, i + 1));
         });
@@ -297,7 +339,7 @@ export default function EventPage() {
         ];
 
         const catMap: Record<string, LeaderRow[]> = {};
-        categories.forEach((catKey) => {
+        (event.categories || []).forEach((catKey) => {
           const list = overallFinal.filter((r) => r.sourceCategoryKey === catKey);
           catMap[catKey] = list;
         });
@@ -314,48 +356,32 @@ export default function EventPage() {
         setState({ status: "ready" });
         setHasLoadedOnce(true);
       } catch (e: any) {
-        const errorMsg = e?.message || "";
-        if (errorMsg.includes("belum diupload")) {
-          setState({
-            status: "error",
-            msg: "CSV files belum diupload untuk event ini. Silakan buka tab Admin untuk upload Master dan Finish CSV.",
-          });
-        } else {
-          setState({
-            status: "error",
-            msg: e?.message || "Gagal load data",
-          });
-        }
+        // Allow page to render even without data - don't block UI
+        setState({ status: "ready" });
+        setHasLoadedOnce(true);
       }
     })();
-  }, [recalcTick, hasLoadedOnce, settingsLoaded, eventId, categories]);
+  }, [recalcTick, event?.id, event?.categories]);
 
-  // 🔁 Refresh when Admin uploads CSV / changes title (cross-tab)
+  // Refresh when data changes
   useEffect(() => {
     const onStorage = (ev: StorageEvent) => {
       if (ev.key === LS_DATA_VERSION) {
         setRecalcTick((t) => t + 1);
-      }
-      if (ev.key === LS_EVENT_TITLE) {
-        setEventTitle(ev.newValue || DEFAULT_EVENT_TITLE);
       }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const tabs = useMemo(
-    () => ["Overall", ...categories, "Admin"],
-    [categories]
-  );
-
-  // ✅ Jika data belum pernah berhasil dimuat (belum upload CSV),
-  // langsung arahkan user ke tab Admin agar bisa upload.
-  useEffect(() => {
-    if (!hasLoadedOnce && state.status === "error") {
-      setActiveTab("Admin");
+  const tabs = useMemo(() => {
+    const baseTabs = ["Participants", "Results", ...(event?.categories || [])];
+    // Add Route tab if GPX file exists
+    if (event?.gpxFile || (event?.latitude && event?.longitude)) {
+      baseTabs.push("Route");
     }
-  }, [hasLoadedOnce, state.status]);
+    return baseTabs;
+  }, [event?.categories, event?.gpxFile, event?.latitude, event?.longitude]);
 
   const onSelectParticipant = (row: LeaderRow) => {
     setSelected(row);
@@ -383,122 +409,547 @@ export default function EventPage() {
     };
   }, [selected, checkpointMap]);
 
-  // ✅ Jangan memblokir UI ketika data belum ada:
-  // Admin harus tetap bisa diakses untuk upload CSV pertama kali.
-  const needsFirstUpload = !hasLoadedOnce && (state.status === "loading" || state.status === "error");
+  if (!event) {
+    return (
+      <>
+        <Navbar />
+        <div className="page">
+          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+            {state.status === "loading" ? (
+              <>
+                <div className="loading-spinner" />
+                <p>{state.msg}</p>
+              </>
+            ) : (
+              <>
+                <h2>Event tidak ditemukan</h2>
+                <Link to="/events" className="btn" style={{ marginTop: '1rem' }}>
+                  Kembali ke Events
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Get first banner as main logo/image
+  const mainBanner = banners.length > 0 ? banners[0] : null;
 
   return (
     <>
       <Navbar />
-      <div className="page">
-        <div className="event-header">
-          <Link to="/" className="back-link">← Back to Events</Link>
-          <h1 className="app-title">{eventTitle}</h1>
+      <div className="event-page">
+        {/* Red Banner Header Area */}
+        <div className="event-banner-header">
+          {/* Banner Carousel */}
+          {banners.length > 0 && (
+            <div className="banner-carousel">
+              <div className="banner-container">
+                {banners.map((banner, index) => (
+                  <img
+                    key={banner.id}
+                    src={banner.imageUrl}
+                    alt={banner.alt || event.name}
+                    className={`banner-image ${index === currentBannerIndex ? 'active' : ''}`}
+                  />
+                ))}
+              </div>
+              {banners.length > 1 && (
+                <div className="banner-indicators">
+                  {banners.map((_, index) => (
+                    <button
+                      key={index}
+                      className={`indicator ${index === currentBannerIndex ? 'active' : ''}`}
+                      onClick={() => setCurrentBannerIndex(index)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-      <div className="tabs">
-        {tabs.map((t) => (
-          <button
-            key={t}
-            className={`tab ${activeTab === t ? "active" : ""}`}
-            onClick={() => setActiveTab(t)}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      {/*  Notice: first-time setup / missing upload */}
-      {needsFirstUpload && activeTab !== "Admin" && (
-        <div className="card">
-          <div className="error-title">Data belum siap</div>
-          <div style={{ marginTop: 6 }}>
-            {state.status === "loading"
-              ? state.msg
-              : state.msg}
+        {/* Event Info Section - Logo left, Info right */}
+        <div className="event-info-section">
+          {/* Event Logo */}
+          <div className="event-logo-container">
+            {mainBanner ? (
+              <img src={mainBanner.imageUrl} alt={event.name} className="event-logo" />
+            ) : (
+              <div className="event-logo-placeholder">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="#9ca3af">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+              </div>
+            )}
           </div>
-          <div style={{ marginTop: 10 }}>
-            <button className="tab active" onClick={() => setActiveTab("Admin")}>
-              Buka Admin untuk Upload CSV
-            </button>
+
+          {/* Event Details */}
+          <div className="event-details">
+            <div className="event-meta-line">
+              {event.eventDate && (
+                <span>
+                  {new Date(event.eventDate).toLocaleDateString('en-US', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    year: 'numeric'
+                  })}
+                </span>
+              )}
+              {event.location && (
+                <>
+                  <span className="separator">|</span>
+                  <span>{event.location}</span>
+                </>
+              )}
+            </div>
+            <h1 className="event-title">{event.name}</h1>
+            {event.description && (
+              <p className="event-description">{event.description}</p>
+            )}
           </div>
         </div>
-      )}
 
+        {/* Navigation Tabs */}
+        <div className="event-tabs-container">
+          <div className="event-tabs">
+            {tabs.map((t) => (
+              <button
+                key={t}
+                className={`event-tab ${activeTab === t ? "active" : ""}`}
+                onClick={() => setActiveTab(t)}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
 
-      {activeTab === "Overall" && (
-        <>
-          {state.status === "ready" || hasLoadedOnce ? (
-            <>
+        {/* Tab Content */}
+        <div className="event-content">
+          {activeTab === "Participants" && (
+            <div className="content-section">
+              <h2 className="section-title">Peserta Terdaftar</h2>
+              {overall.length > 0 ? (
+                <>
+                  {/* Simple stats without gradient */}
+                  <div className="simple-stats">
+                    <div className="simple-stat">
+                      <span className="stat-number">{overall.length}</span>
+                      <span className="stat-text">Total Peserta</span>
+                    </div>
+                    <div className="simple-stat">
+                      <span className="stat-number">
+                        {overall.filter(r => r.totalTimeDisplay !== "DNF" && r.totalTimeDisplay !== "DSQ").length}
+                      </span>
+                      <span className="stat-text">Finisher</span>
+                    </div>
+                    <div className="simple-stat">
+                      <span className="stat-number">{event.categories?.length || 0}</span>
+                      <span className="stat-text">Kategori</span>
+                    </div>
+                  </div>
+                  <LeaderboardTable
+                    title=""
+                    rows={overall}
+                    onSelect={onSelectParticipant}
+                  />
+                </>
+              ) : (
+                <div className="empty-state">
+                  <svg width="64" height="64" viewBox="0 0 24 24" fill="#d1d5db">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                  </svg>
+                  <p>Belum ada data peserta</p>
+                  <span className="subtle">Data peserta akan muncul setelah admin mengupload file CSV</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "Results" && (
+            <div className="content-section">
               <RaceClock />
               <LeaderboardTable
                 title="Overall Result (All Categories)"
                 rows={overall}
                 onSelect={onSelectParticipant}
               />
-            </>
-          ) : (
-            <div className="card">
-              Silakan login tab <b>Admin</b> untuk upload CSV (Master &amp; Finish wajib; Start optional jika memakai start global per kategori).
             </div>
           )}
-        </>
-      )}
 
-
-      {activeTab !== "Overall" && activeTab !== "Admin" && (
-        <>
-          {state.status === "ready" || hasLoadedOnce ? (
-            <>
+          {activeTab !== "Participants" && activeTab !== "Results" && activeTab !== "Route" && (
+            <div className="content-section">
               <RaceClock />
               <CategorySection
                 categoryKey={activeTab}
                 rows={(byCategory as any)[activeTab] || []}
                 onSelect={onSelectParticipant}
               />
-            </>
-          ) : (
-            <div className="card">
-              Data belum tersedia. Buka tab <b>Admin</b> untuk upload CSV.
             </div>
           )}
-        </>
-      )}
 
+          {activeTab === "Route" && (
+            <div className="content-section">
+              <h2 className="section-title">Rute Lomba</h2>
+              <div className="route-map-container">
+                {(gpxTrackPoints.length > 0 || (event?.latitude && event?.longitude)) ? (
+                  <iframe
+                    src={`/route-map.html?eventId=${event?.id}&lat=${event?.latitude || ''}&lng=${event?.longitude || ''}&hasGpx=${gpxTrackPoints.length > 0 ? '1' : '0'}`}
+                    width="100%"
+                    height="500"
+                    style={{ border: 0, borderRadius: '8px' }}
+                    title="Route Map"
+                  />
+                ) : (
+                  <div className="empty-state">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="#d1d5db">
+                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                    <p>Rute belum tersedia</p>
+                    <span className="subtle">Admin akan mengupload file GPX rute lomba</span>
+                  </div>
+                )}
+              </div>
+              
+              {gpxTrackPoints.length > 0 && (
+                <div className="route-info">
+                  <strong>Info Rute:</strong> {gpxTrackPoints.length} titik koordinat
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
-      {activeTab === "Admin" && (
-        <AdminPage
-          eventId={eventId || undefined}
-          allRows={overall}
-          onConfigChanged={() => setRecalcTick((t) => t + 1)}
+        <ParticipantModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          data={modalData}
         />
-      )}
 
-      <ParticipantModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        data={modalData}
-      />
+        <style>{`
+          .event-page {
+            min-height: 100vh;
+            background: #f8f9fa;
+          }
 
-      <style>{`
-        .event-header {
-          margin-bottom: 1rem;
-        }
+          .event-banner-header {
+            background: linear-gradient(135deg, #c62828, #e53935);
+            padding: 0;
+            min-height: 80px;
+          }
 
-        .back-link {
-          display: inline-block;
-          color: #667eea;
-          text-decoration: none;
-          font-weight: 500;
-          margin-bottom: 0.5rem;
-          transition: color 0.2s;
-        }
+          .banner-carousel {
+            position: relative;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            height: 200px;
+            overflow: hidden;
+          }
 
-        .back-link:hover {
-          color: #5568d3;
-          text-decoration: underline;
-        }
-      `}</style>
+          .banner-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+          }
+
+          .banner-image {
+            position: absolute;
+            max-height: 100%;
+            max-width: 100%;
+            object-fit: contain;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+          }
+
+          .banner-image.active {
+            opacity: 1;
+          }
+
+          .banner-indicators {
+            position: absolute;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 0.5rem;
+          }
+
+          .indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            transition: all 0.3s;
+          }
+
+          .indicator.active {
+            background: white;
+            width: 24px;
+            border-radius: 5px;
+          }
+
+          .event-info-section {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 1.5rem;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+          }
+
+          .event-logo-container {
+            flex-shrink: 0;
+          }
+
+          .event-logo {
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: white;
+            padding: 8px;
+          }
+
+          .event-logo-placeholder {
+            width: 100px;
+            height: 100px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f3f4f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          .event-details {
+            flex: 1;
+          }
+
+          .event-meta-line {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 0.5rem;
+          }
+
+          .event-meta-line .separator {
+            margin: 0 0.5rem;
+          }
+
+          .event-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin: 0 0 0.5rem 0;
+            line-height: 1.3;
+          }
+
+          .event-description {
+            font-size: 0.9rem;
+            color: #6b7280;
+            margin: 0;
+            line-height: 1.5;
+          }
+
+          .event-tabs-container {
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+          }
+
+          .event-tabs {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            gap: 0;
+            overflow-x: auto;
+          }
+
+          .event-tab {
+            padding: 1rem 1.5rem;
+            border: none;
+            background: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+            white-space: nowrap;
+          }
+
+          .event-tab:hover {
+            color: #c62828;
+          }
+
+          .event-tab.active {
+            color: #c62828;
+            border-bottom-color: #c62828;
+          }
+
+          .event-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem;
+          }
+
+          .content-section {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+          }
+
+          .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #c62828;
+            margin: 0 0 1rem 0;
+          }
+
+          /* Simple stats - no gradient */
+          .simple-stats {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+          }
+
+          .simple-stat {
+            display: flex;
+            flex-direction: column;
+          }
+
+          .stat-number {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #1f2937;
+          }
+
+          .stat-text {
+            font-size: 0.8rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+          }
+
+          .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+          }
+
+          .empty-state svg {
+            margin-bottom: 1rem;
+          }
+
+          .empty-state p {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+          }
+
+          .empty-state .subtle {
+            font-size: 0.875rem;
+            color: #9ca3af;
+          }
+
+          .route-map-container {
+            margin-top: 1rem;
+          }
+
+          .route-map-container iframe {
+            width: 100%;
+            height: 500px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+          }
+
+          .route-info {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            background: #f9fafb;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            color: #6b7280;
+          }
+
+          .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f4f6;
+            border-top-color: #c62828;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+          }
+
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+
+          @media (max-width: 768px) {
+            .event-info-section {
+              flex-direction: column;
+              align-items: center;
+              text-align: center;
+              padding: 1rem;
+            }
+
+            .event-logo {
+              width: 80px;
+              height: 80px;
+            }
+
+            .event-title {
+              font-size: 1.25rem;
+            }
+
+            .event-tabs {
+              padding: 0 1rem;
+            }
+
+            .event-tab {
+              padding: 0.75rem 1rem;
+              font-size: 0.8rem;
+            }
+
+            .event-content {
+              padding: 1rem;
+            }
+
+            .simple-stats {
+              flex-wrap: wrap;
+              justify-content: center;
+              gap: 1.5rem;
+            }
+
+            .simple-stat {
+              align-items: center;
+              min-width: 80px;
+            }
+
+            .banner-carousel {
+              height: 150px;
+            }
+
+            .route-map-container iframe {
+              height: 350px;
+            }
+          }
+        `}</style>
       </div>
     </>
   );

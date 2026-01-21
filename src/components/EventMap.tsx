@@ -17,7 +17,7 @@ interface EventMapProps {
   onEventClick?: (event: Event) => void;
 }
 
-export default function EventMap({ events, onEventClick }: EventMapProps) {
+export default function EventMap({ events, onEventClick: _onEventClick }: EventMapProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [mapReady, setMapReady] = useState(false);
 

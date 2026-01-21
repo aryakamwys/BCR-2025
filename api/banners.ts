@@ -39,16 +39,11 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
   try {
     const eventId = event.queryStringParameters?.eventId;
 
-    if (!eventId) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'eventId is required' }),
-      };
-    }
+    // If eventId provided, filter by eventId, otherwise return all banners
+    const where = eventId ? { eventId } : {};
 
     const banners = await prisma.banner.findMany({
-      where: { eventId },
+      where,
       orderBy: { order: 'asc' },
     });
 

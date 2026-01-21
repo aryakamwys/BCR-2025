@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LeaderRow } from "./LeaderboardTable";
 import { CATEGORY_KEYS, DEFAULT_EVENT_TITLE, LS_DATA_VERSION, LS_EVENT_TITLE, type CsvKind, getCategoriesForEvent } from "../lib/config";
 import { putCsvFile, deleteCsvFile, listCsvMeta } from "../lib/idb";
-import { parseCsv, countDataRows } from "../lib/csvParse";
+import { parseCsv } from "../lib/csvParse";
 import CategoryManager from "./CategoryManager";
 import { uploadBannerViaApi } from "../lib/storage";
 import { useEvent } from "../contexts/EventContext";
@@ -55,18 +55,7 @@ function saveCatStartMap(map: Record<string, string>) {
   localStorage.setItem(LS_CAT_START, JSON.stringify(map));
 }
 
-function formatNowAsTimestamp(): string {
-  const d = new Date();
-  const pad = (n: number, len = 2) => String(n).padStart(len, "0");
-  const Y = d.getFullYear();
-  const M = pad(d.getMonth() + 1);
-  const D = pad(d.getDate());
-  const h = pad(d.getHours());
-  const m = pad(d.getMinutes());
-  const s = pad(d.getSeconds());
-  const ms = pad(d.getMilliseconds(), 3);
-  return `${Y}-${M}-${D} ${h}:${m}:${s}.${ms}`;
-}
+type AdminSection = 'overview' | 'csv' | 'banners' | 'categories' | 'timing' | 'dsq' | 'events';
 
 export default function AdminPage({
   allRows,
@@ -81,6 +70,8 @@ export default function AdminPage({
   const [authed, setAuthed] = useState(loadAuth());
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
+  const [activeSection, setActiveSection] = useState<AdminSection>('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [cutoffHours, setCutoffHours] = useState(() => {
     const ms = loadCutoffMs();
@@ -102,14 +93,14 @@ export default function AdminPage({
 
   // Event management state
   const [events, setEvents] = useState<any[]>([]);
-  const [showEventForm, setShowEventForm] = useState(false);
+  const [_showEventForm, setShowEventForm] = useState(false);
   const [newEventName, setNewEventName] = useState('');
   const [newEventDate, setNewEventDate] = useState('');
   const [newEventLocation, setNewEventLocation] = useState('');
   const [newEventLatitude, setNewEventLatitude] = useState('');
   const [newEventLongitude, setNewEventLongitude] = useState('');
   const [newEventDescription, setNewEventDescription] = useState('');
-  const [newEventActive, setNewEventActive] = useState(true);
+  const newEventActive = true;
 
   // Banner management state
   const [banners, setBanners] = useState<any[]>([]);
@@ -141,6 +132,30 @@ export default function AdminPage({
           setCategories(cats);
         } catch (error) {
         }
+      }
+
+      // Load events
+      try {
+        const res = await fetch('/api/events');
+        const data = await res.json();
+        setEvents(data);
+      } catch (error) {
+        console.error('Failed to load events:', error);
+        setEvents([]);
+      }
+
+      // Load banners
+      try {
+        const res = await fetch('/api/banners');
+        if (res.ok) {
+          const data = await res.json();
+          setBanners(Array.isArray(data) ? data : []);
+        } else {
+          setBanners([]);
+        }
+      } catch (error) {
+        console.error('Failed to load banners:', error);
+        setBanners([]);
       }
     })();
   }, [authed, eventId]);
@@ -196,895 +211,904 @@ export default function AdminPage({
     // Validasi untuk Master CSV
     if (kind === "master") {
       const epcAliases = headerAliases.epc.map(norm);
-      const hasEpc = headersNorm.some((h) =>
-        epcAliases.some((alias) => h === alias || h.includes(alias))
-      );
+      const hasEpc = headersNorm.some((h) => epcAliases.includes(h));
 
-      if (!hasEpc) {
-        const headerList = headers.length > 0 ? headers.join(", ") : "(tidak ada header)";
+      const bibAliases = headerAliases.bib.map(norm);
+      const hasBib = headersNorm.some((h) => bibAliases.includes(h));
+
+      const nameAliases = headerAliases.name.map(norm);
+      const hasName = headersNorm.some((h) => nameAliases.includes(h));
+
+      if (!hasEpc && !hasBib && !hasName) {
         alert(
-          `CSV '${kind}': kolom EPC tidak ditemukan.\n\n` +
-          `Kolom yang ditemukan: ${headerList}\n\n` +
-          `Format Master CSV harus memiliki kolom:\n` +
-          `- EPC (atau UID, Tag, RFID, Chip EPC)\n` +
-          `- NO BIB (atau BIB, Bib Number)\n` +
-          `- Nama Lengkap (atau Name, Nama)\n` +
-          `- Gender (atau Jenis Kelamin, JK)\n` +
-          `- Kategori (atau Category, Kelas)\n\n` +
-          `Catatan: CSV yang diupload sepertinya adalah hasil export leaderboard.\n` +
-          `Master CSV harus berisi data peserta dengan kolom EPC untuk matching.`
+          `CSV 'master': Kolom wajib tidak ditemukan.\n` +
+            `Harap ada salah satu dari: EPC/UID/TAG, BIB, atau NAME.\n` +
+            `Kolom saat ini: ${headers.join(", ")}`
         );
         return;
       }
     }
 
-    // Validasi untuk Start, Finish, Checkpoint CSV
-    if (kind !== "master") {
+    // Validasi untuk Start/Finish/Checkpoint CSV
+    if (kind === "start" || kind === "finish" || kind === "checkpoint") {
       const epcAliases = headerAliases.epc.map(norm);
-      const timesAliases = headerAliases.times.map(norm);
+      const hasEpc = headersNorm.some((h) => epcAliases.includes(h));
 
-      const hasEpc = headersNorm.some((h) =>
-        epcAliases.some((alias) => h === alias || h.includes(alias))
-      );
-      const hasTimes = headersNorm.some((h) =>
-        timesAliases.some((alias) => h === alias || h.includes(alias))
-      );
+      const timeAliases = headerAliases.times.map(norm);
+      const hasTime = headersNorm.some((h) => timeAliases.includes(h));
 
-      if (!hasEpc) {
-        const headerList = headers.length > 0 ? headers.join(", ") : "(tidak ada header)";
+      if (!hasEpc || !hasTime) {
         alert(
-          `CSV '${kind}': kolom EPC tidak ditemukan.\n\n` +
-          `Kolom yang ditemukan: ${headerList}\n\n` +
-          `Format CSV '${kind}' harus memiliki:\n` +
-          `- EPC (atau UID, Tag, RFID)\n` +
-          `- Times (atau Time, Timestamp, Jam)`
-        );
-        return;
-      }
-
-      if (!hasTimes) {
-        const headerList = headers.length > 0 ? headers.join(", ") : "(tidak ada header)";
-        alert(
-          `CSV '${kind}': kolom Times/Time tidak ditemukan.\n\n` +
-          `Kolom yang ditemukan: ${headerList}\n\n` +
-          `Format CSV '${kind}' harus memiliki:\n` +
-          `- EPC (atau UID, Tag, RFID)\n` +
-          `- Times (atau Time, Timestamp, Jam)`
+          `CSV '${kind}': Kolom wajib tidak lengkap.\n` +
+            `Harap ada kolom: EPC/UID/TAG dan TIME/TIMESTAMP.\n` +
+            `Kolom saat ini: ${headers.join(", ")}`
         );
         return;
       }
     }
 
-    const rows = countDataRows(grid);
-
-    await putCsvFile({ kind, text, filename: file.name, rows, eventId });
-
-    bumpDataVersion();
-    onConfigChanged();
-    await refreshCsvMeta();
-    alert(`'${kind}' berhasil diupload (${rows} baris)`);
-  };
-
-  const clearAllCsv = async () => {
-    if (!confirm("Reset semua CSV yang sudah diupload?")) return;
-    for (const k of ["master", "start", "finish", "checkpoint"] as CsvKind[]) {
-      await deleteCsvFile(k, eventId);
-    }
-    bumpDataVersion();
-    onConfigChanged();
-    await refreshCsvMeta();
-    alert("Semua CSV yang diupload telah dihapus");
-  };
-
-  const filtered = useMemo(() => {
-    const qq = q.trim().toLowerCase();
-    if (!qq) return allRows;
-    return allRows.filter(
-      (r) =>
-        (r.bib || "").toLowerCase().includes(qq) ||
-        (r.name || "").toLowerCase().includes(qq)
-    );
-  }, [q, allRows]);
-
-  const metaByKind = useMemo(() => {
-    const m: Partial<Record<CsvKind, { filename: string; updatedAt: number; rows: number }>> = {};
-    csvMeta.forEach((x) => {
-      m[x.key] = { filename: x.filename, updatedAt: x.updatedAt, rows: x.rows };
+    await putCsvFile({
+      kind,
+      text,
+      filename: file.name,
+      rows: grid.length - 1,
+      eventId,
     });
-    return m;
-  }, [csvMeta]);
-
-  const login = () => {
-    if (user === ADMIN_USER && pass === ADMIN_PASS) {
-      saveAuth(true);
-      setAuthed(true);
-    } else {
-      alert("Kredensial tidak valid");
-    }
+    bumpDataVersion();
+    await refreshCsvMeta();
+    alert(`CSV '${kind}' berhasil diupload!`);
   };
 
-
-  const logout = () => {
-    saveAuth(false);
-    setAuthed(false);
-  };
-
-  const applyCutoff = async () => {
-    const h = Number(cutoffHours);
-    let ms: number | null = null;
-    if (!Number.isFinite(h) || h <= 0) {
-      saveCutoffMs(null);
-    } else {
-      ms = h * 3600000;
-      saveCutoffMs(ms);
-    }
-
-    onConfigChanged();
-    alert("Cut off time berhasil diperbarui");
-  };
-
-  const toggleDQ = async (epc: string) => {
-    const next = { ...dqMap, [epc]: !dqMap[epc] };
-    if (!next[epc]) delete next[epc];
-    setDqMap(next);
-    saveDQMap(next);
-    onConfigChanged();
-  };
-
-  const applyCatStart = async () => {
-    saveCatStartMap(catStart);
-    onConfigChanged();
-    alert(
-      "Waktu start kategori berhasil diperbarui.\nTotal time akan menggunakan nilai ini per kategori."
-    );
-  };
-
-  const loadEvents = async () => {
-    try {
-      const response = await fetch('/api/events');
-      if (response.ok) {
-        const data = await response.json();
-        setEvents(data);
-      }
-    } catch (error) {
-    }
-  };
-
-  const createEvent = async () => {
-    if (!newEventName.trim()) {
-      alert('Event name is required');
-      return;
-    }
-    if (!newEventDate) {
-      alert('Event date is required');
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/events', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: newEventName.trim(),
-          description: newEventDescription.trim(),
-          eventDate: newEventDate,
-          location: newEventLocation.trim(),
-          latitude: newEventLatitude.trim() ? parseFloat(newEventLatitude.trim()) : null,
-          longitude: newEventLongitude.trim() ? parseFloat(newEventLongitude.trim()) : null,
-          isActive: newEventActive,
-          categories: [...CATEGORY_KEYS],
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to create event' }));
-        throw new Error(errorData.error || 'Failed to create event');
-      }
-
-      const event = await response.json();
-
-      // Reset form
-      setNewEventName('');
-      setNewEventDate('');
-      setNewEventLocation('');
-      setNewEventLatitude('');
-      setNewEventLongitude('');
-      setNewEventDescription('');
-      setNewEventActive(true);
-      setShowEventForm(false);
-
-      // Reload events list
-      await loadEvents();
-      await refreshEvents();
-
-      alert(`Event "${event.name}" created successfully!`);
-    } catch (err: any) {
-      alert(err.message || 'Failed to create event');
-    }
-  };
-
-  // Load events when authenticated
-  useEffect(() => {
-    if (authed) {
-      loadEvents();
-      loadBanners();
-    }
-  }, [authed, eventId]);
-
-  const loadBanners = async () => {
-    if (!eventId) return;
-    try {
-      const response = await fetch(`/api/banners?eventId=${eventId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setBanners(data);
-      }
-    } catch (error) {
-    }
+  const deleteCsv = async (kind: CsvKind) => {
+    if (!confirm(`Yakin hapus CSV '${kind}'?`)) return;
+    await deleteCsvFile(kind, eventId);
+    bumpDataVersion();
+    await refreshCsvMeta();
   };
 
   const handleBannerUpload = async () => {
     if (!bannerFile) {
-      alert('Please select an image file');
-      return;
-    }
-    if (!eventId) {
-      alert('Event ID is required');
+      alert('Pilih file banner terlebih dahulu');
       return;
     }
 
     setUploadingBanner(true);
-
     try {
-      const result = await uploadBannerViaApi(eventId, bannerFile);
-
+      await uploadBannerViaApi(eventId || 'default', bannerFile, bannerAlt, bannerOrder);
+      alert('Banner berhasil diupload!');
       setBannerFile(null);
       setBannerAlt('');
       setBannerOrder(0);
-      const fileInput = document.getElementById('banner-upload') as HTMLInputElement;
-      if (fileInput) fileInput.value = '';
 
-      await loadBanners();
-
-      alert('Banner uploaded successfully!');
-    } catch (error: any) {
-      alert(error.message || 'Failed to upload banner');
+      // Refresh banners
+      try {
+        const res = await fetch('/api/banners');
+        if (res.ok) {
+          const data = await res.json();
+          setBanners(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('Failed to refresh banners:', error);
+      }
+    } catch (error) {
+      alert('Gagal mengupload banner');
     } finally {
       setUploadingBanner(false);
     }
   };
 
-  const toggleBannerActive = async (bannerId: string) => {
-    try {
-      const banner = banners.find((b: any) => b.id === bannerId);
-      if (!banner) return;
+  const handleDeleteBanner = async (id: string) => {
+    if (!confirm('Yakin hapus banner ini?')) return;
 
-      const response = await fetch('/api/update-banner', {
+    try {
+      const res = await fetch(`/api/banner-delete/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        alert('Banner berhasil dihapus');
+        // Refresh banners
+        try {
+          const bannersRes = await fetch('/api/banners');
+          if (bannersRes.ok) {
+            const data = await bannersRes.json();
+            setBanners(Array.isArray(data) ? data : []);
+          }
+        } catch (error) {
+          console.error('Failed to refresh banners:', error);
+        }
+      } else {
+        alert('Gagal menghapus banner');
+      }
+    } catch (error) {
+      alert('Gagal menghapus banner');
+    }
+  };
+
+  const handleToggleBannerActive = async (id: string, active: boolean) => {
+    try {
+      const res = await fetch(`/api/banners/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: !active })
+      });
+
+      if (res.ok) {
+        // Refresh banners
+        try {
+          const bannersRes = await fetch('/api/banners');
+          if (bannersRes.ok) {
+            const data = await bannersRes.json();
+            setBanners(Array.isArray(data) ? data : []);
+          }
+        } catch (error) {
+          console.error('Failed to refresh banners:', error);
+        }
+      }
+    } catch (error) {
+      alert('Gagal update banner');
+    }
+  };
+
+  const handleCreateEvent = async () => {
+    if (!newEventName || !newEventDate) {
+      alert('Nama event dan tanggal wajib diisi');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/events', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          bannerId,
-          isActive: !banner.isActive,
-        }),
+          name: newEventName,
+          date: newEventDate,
+          location: newEventLocation,
+          latitude: newEventLatitude ? parseFloat(newEventLatitude) : undefined,
+          longitude: newEventLongitude ? parseFloat(newEventLongitude) : undefined,
+          description: newEventDescription,
+          status: newEventActive ? 'upcoming' : 'completed'
+        })
       });
 
-      if (response.ok) {
-        await loadBanners();
+      if (res.ok) {
+        alert('Event berhasil dibuat!');
+        setShowEventForm(false);
+        setNewEventName('');
+        setNewEventDate('');
+        setNewEventLocation('');
+        setNewEventLatitude('');
+        setNewEventLongitude('');
+        setNewEventDescription('');
+
+        // Refresh events
+        const eventsRes = await fetch('/api/events');
+        const eventsData = await eventsRes.json();
+        setEvents(eventsData);
+
+        refreshEvents();
+      } else {
+        alert('Gagal membuat event');
       }
     } catch (error) {
+      alert('Gagal membuat event');
     }
   };
 
-  const deleteBanner = async (bannerId: string, imageUrl: string) => {
-    if (!confirm('Are you sure you want to delete this banner?')) return;
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    if (!query) return allRows;
+    return allRows.filter((r) => String(r.bib).toLowerCase().includes(query));
+  }, [q, allRows]);
 
-    try {
-      const response = await fetch(`/api/delete-banner?bannerId=${bannerId}&imageUrl=${encodeURIComponent(imageUrl)}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        await loadBanners();
-        alert('Banner deleted successfully!');
-      }
-    } catch (error) {
-      alert('Failed to delete banner');
-    }
-  };
-
+  // Login form
   if (!authed) {
     return (
-      <div className="card">
-        <h2 className="section-title">Admin Login</h2>
-        <div className="subtle">Akses terbatas</div>
+      <div className="min-h-screen bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span className="text-white font-bold text-3xl">B</span>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Admin Login</h2>
+            <p className="text-gray-600 mt-2">BIP Runner Dashboard</p>
+          </div>
 
-        <div className="admin-login">
-          <input
-            className="search"
-            placeholder="Username"
-            value={user}
-            onChange={(e) => setUser(e.target.value)}
-          />
-          <input
-            className="search"
-            type="password"
-            placeholder="Password"
-            value={pass}
-            onChange={(e) => setPass(e.target.value)}
-          />
-          <button className="btn" onClick={login}>
-            Login
-          </button>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <input
+                type="text"
+                value={user}
+                onChange={(e) => setUser(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                placeholder="admin@biprunner.com"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <input
+                type="password"
+                value={pass}
+                onChange={(e) => setPass(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && (() => {
+                  if (user === ADMIN_USER && pass === ADMIN_PASS) {
+                    saveAuth(true);
+                    setAuthed(true);
+                  } else {
+                    alert("Email atau password salah!");
+                  }
+                })()}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                placeholder="••••••••"
+              />
+            </div>
+            <button
+              onClick={() => {
+                if (user === ADMIN_USER && pass === ADMIN_PASS) {
+                  saveAuth(true);
+                  setAuthed(true);
+                } else {
+                  alert("Email atau password salah!");
+                }
+              }}
+              className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 transition-colors"
+            >
+              Sign In
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div>
-      {/* Event Title */}
-      <div className="card">
-        <div className="header-row">
-          <div>
-            <h2 className="section-title">Event Settings</h2>
-            <div className="subtle">Ubah judul event yang tampil di halaman leaderboard.</div>
+    <div className="admin min-h-screen bg-gray-50 flex">
+      {/* Hamburger Toggle (Mobile Only) */}
+      <button
+        className="hamburger-toggle lg:hidden"
+        onClick={() => setSidebarOpen(true)}
+        aria-label="Toggle sidebar"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
+      </button>
+
+      {/* Sidebar Backdrop */}
+      <div
+        className={`sidebar-backdrop ${sidebarOpen ? 'visible' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
+      {/* Sidebar */}
+      <aside
+        className={`admin-sidebar ${sidebarOpen ? 'mobile-visible' : 'mobile-hidden'} lg:transform-none`}
+      >
+        {/* Logo/Header */}
+        <div className="sidebar-header">
+          <div className="sidebar-logo">
+            <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-lg">B</span>
+            </div>
+            <span className="sidebar-logo-text">Admin Panel</span>
           </div>
-          <button className="btn" onClick={saveEventTitle}>
-            Save Title
-          </button>
         </div>
 
-        <div className="admin-cutoff">
-          <div className="label">Event Title</div>
-          <div className="tools">
-            <input
-              className="search"
-              style={{ width: "100%" }}
-              placeholder={DEFAULT_EVENT_TITLE}
-              value={eventTitle}
-              onChange={(e) => setEventTitle(e.target.value)}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Manage Events - New Section */}
-      <div className="card">
-        <div className="header-row">
-          <div>
-            <h2 className="section-title">Manage Events</h2>
-            <div className="subtle">Create and manage multiple race events.</div>
-          </div>
-          <button className="btn" onClick={() => setShowEventForm(!showEventForm)}>
-            {showEventForm ? "Cancel" : "+ Create Event"}
-          </button>
-        </div>
-
-        <div style={{
-          marginTop: '1rem',
-          padding: '0.75rem',
-          background: '#e7f3ff',
-          border: '1px solid #2196F3',
-          borderRadius: '4px',
-          color: '#0d47a1',
-          fontSize: '14px'
-        }}>
-          <strong>ℹ️:</strong> Setiap event memiliki kategori dan data CSV sendiri.
-          Pilih event dari data table di bawah untuk mengelola event tersebut.
-        </div>
-
-        {showEventForm && (
-          <div style={{ marginTop: "1rem", padding: "1rem", background: "#f9fafb", borderRadius: "8px" }}>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>Event Name</label>
-              <input
-                className="search"
-                style={{ width: "100%" }}
-                placeholder="e.g., Jakarta Marathon 2025"
-                value={newEventName}
-                onChange={(e) => setNewEventName(e.target.value)}
-              />
-            </div>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>Event Date</label>
-              <input
-                type="date"
-                className="search"
-                style={{ width: "100%" }}
-                value={newEventDate}
-                onChange={(e) => setNewEventDate(e.target.value)}
-              />
-            </div>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>Location</label>
-              <input
-                className="search"
-                style={{ width: "100%" }}
-                placeholder="e.g., Jakarta, Indonesia"
-                value={newEventLocation}
-                onChange={(e) => setNewEventLocation(e.target.value)}
-              />
-            </div>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
-                Coordinates (Optional)
-              </label>
-              <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "0.5rem" }}>
-                For accurate map placement, enter coordinates from Google Maps. Right-click on a location → "What's here?" to get coordinates.
-              </div>
-              <div style={{ display: "flex", gap: "1rem" }}>
-                <input
-                  className="search"
-                  style={{ flex: 1 }}
-                  placeholder="Latitude (e.g., -6.9732083)"
-                  value={newEventLatitude}
-                  onChange={(e) => setNewEventLatitude(e.target.value)}
-                />
-                <input
-                  className="search"
-                  style={{ flex: 1 }}
-                  placeholder="Longitude (e.g., 107.6308535)"
-                  value={newEventLongitude}
-                  onChange={(e) => setNewEventLongitude(e.target.value)}
-                />
-              </div>
-            </div>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>Description</label>
-              <textarea
-                className="search"
-                style={{ width: "100%", minHeight: "80px" }}
-                placeholder="Brief description of the event..."
-                value={newEventDescription}
-                onChange={(e) => setNewEventDescription(e.target.value)}
-              />
-            </div>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <input
-                  type="checkbox"
-                  checked={newEventActive}
-                  onChange={(e) => setNewEventActive(e.target.checked)}
-                />
-                <span>Event is active</span>
-              </label>
-            </div>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              <button className="btn" onClick={createEvent}>
-                Create Event
-              </button>
-              <button className="btn ghost" onClick={() => {
-                setShowEventForm(false);
-                setNewEventName("");
-                setNewEventDate("");
-                setNewEventLocation("");
-                setNewEventLatitude("");
-                setNewEventLongitude("");
-                setNewEventDescription("");
-                setNewEventActive(true);
-              }}>
-                Clear
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="table-wrap" style={{ marginTop: "1rem" }}>
-          <table className="f1-table compact">
-            <thead>
-              <tr>
-                <th>Event Name</th>
-                <th>Date</th>
-                <th>Location</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="empty">No events created yet</td>
-                </tr>
-              ) : (
-                events.map((evt) => (
-                  <tr key={evt.id} className="row-hover">
-                    <td className="name-cell">{evt.name}</td>
-                    <td className="mono">{new Date(evt.eventDate).toLocaleDateString()}</td>
-                    <td>{evt.location || "-"}</td>
-                    <td>
-                      <span className={`badge ${evt.isActive ? 'badge-live' : 'badge-completed'}`}>
-                        {evt.isActive ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        className="btn ghost"
-                        onClick={() => window.open(`/event/${evt.slug}`, '_blank')}
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* CSV Upload */}
-      <div className="card">
-        <div className="header-row">
-          <div>
-            <h2 className="section-title">CSV Upload (Master / Start / Finish / Checkpoint)</h2>
-            <div className="subtle">
-              Data timing sekarang berasal dari file CSV upload (bukan Google Sheet).
-              <b>Master &amp; Finish wajib</b>. <b>Start tidak wajib</b> jika kamu memakai
-              <b> Category Start Times</b> (start global per kategori) di bawah.
-              Checkpoint optional.
-            </div>
-          </div>
-          <div className="tools">
-            <button className="btn ghost" onClick={() => refreshCsvMeta()}>
-              Refresh Status
+        {/* Navigation */}
+        <nav className="sidebar-nav">
+          <div className="sidebar-section">
+            <button
+              onClick={() => { setActiveSection('overview'); setSidebarOpen(false); }}
+              className={`sidebar-menu-item ${activeSection === 'overview' ? 'active' : ''}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+              </svg>
+              <span>Overview</span>
             </button>
-            <button className="btn" onClick={clearAllCsv}>
-              Reset Uploaded CSV
+          </div>
+
+          <div className="sidebar-section">
+            <button
+              onClick={() => { setActiveSection('events'); setSidebarOpen(false); }}
+              className={`sidebar-menu-item ${activeSection === 'events' ? 'active' : ''}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+              </svg>
+              <span>Events</span>
+            </button>
+          </div>
+
+          <div className="sidebar-section">
+            <button
+              onClick={() => { setActiveSection('csv'); setSidebarOpen(false); }}
+              className={`sidebar-menu-item ${activeSection === 'csv' ? 'active' : ''}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5" />
+              </svg>
+              <span>Data Upload</span>
+            </button>
+          </div>
+
+          <div className="sidebar-section">
+            <button
+              onClick={() => { setActiveSection('banners'); setSidebarOpen(false); }}
+              className={`sidebar-menu-item ${activeSection === 'banners' ? 'active' : ''}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+              </svg>
+              <span>Banners</span>
+            </button>
+          </div>
+
+          <div className="sidebar-section">
+            <button
+              onClick={() => { setActiveSection('categories'); setSidebarOpen(false); }}
+              className={`sidebar-menu-item ${activeSection === 'categories' ? 'active' : ''}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125 1.125Z" />
+              </svg>
+              <span>Categories</span>
+            </button>
+          </div>
+
+          <div className="sidebar-section">
+            <button
+              onClick={() => { setActiveSection('timing'); setSidebarOpen(false); }}
+              className={`sidebar-menu-item ${activeSection === 'timing' ? 'active' : ''}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+              <span>Timing Rules</span>
+            </button>
+          </div>
+
+          <div className="sidebar-section">
+            <button
+              onClick={() => { setActiveSection('dsq'); setSidebarOpen(false); }}
+              className={`sidebar-menu-item ${activeSection === 'dsq' ? 'active' : ''}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
+              <span>DQ / DNF</span>
+            </button>
+          </div>
+        </nav>
+
+        {/* User Profile Footer */}
+        <div className="sidebar-footer">
+          <div className="sidebar-user">
+            <div className="sidebar-user-avatar">A</div>
+            <div className="sidebar-user-info">
+              <div className="sidebar-user-name">Admin</div>
+              <div className="sidebar-user-email">admin@biprunner.com</div>
+            </div>
+            <button
+              className="sidebar-logout-btn"
+              onClick={() => {
+                saveAuth(false);
+                setAuthed(false);
+                window.location.reload();
+              }}
+              title="Logout"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+              </svg>
             </button>
           </div>
         </div>
+      </aside>
 
-        <div className="table-wrap">
-          <table className="f1-table compact">
-            <thead>
-              <tr>
-                <th style={{ width: 140 }}>Type</th>
-                <th>Upload</th>
-                <th style={{ width: 320 }}>Current File</th>
-                <th style={{ width: 120 }}>Rows</th>
-                <th style={{ width: 200 }}>Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(["master", "start", "finish", "checkpoint"] as CsvKind[]).map((kind) => {
-                const meta = metaByKind[kind];
-                return (
-                  <tr key={kind} className="row-hover">
-                    <td className="mono strong">{kind.toUpperCase()}</td>
-                    <td>
-                      <input
-                        type="file"
-                        accept=".csv,text/csv"
-                        onChange={(e) => {
-                          const f = (e.target as HTMLInputElement).files?.[0];
-                          if (f) uploadCsv(kind, f);
-                        }}
-                      />
-                    </td>
-                    <td className="mono">{meta?.filename || "-"}</td>
-                    <td className="mono">{meta?.rows ?? "-"}</td>
-                    <td className="mono">
-                      {meta?.updatedAt
-                        ? new Date(meta.updatedAt).toLocaleString()
-                        : "-"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      {/* Main Content */}
+      <main className="admin-content">
+        <div className="p-6 lg:p-8 max-w-6xl">
+          {activeSection === 'overview' && (
+            <>
+              <h1 className="text-3xl font-bold text-gray-900 mb-6">Dashboard Overview</h1>
 
-        <div className="subtle" style={{ marginTop: 8 }}>
-          Format kolom minimal:
-          <ul style={{ marginTop: 6, marginBottom: 0 }}>
-            <li><b>Master</b>: EPC, Nama, Kelamin, Kategori, BIB (mis: BIB Number)</li>
-            <li><b>Finish / Checkpoint</b>: EPC, Times (atau Time / Timestamp)</li>
-            <li><b>Start</b>: optional (bisa pakai Category Start Times). Jika dipakai: EPC, Times (atau Time / Timestamp)</li>
-          </ul>
-        </div>
-      </div>
-
-      {/* Banner Images */}
-      {eventId && (
-        <div className="card">
-          <div className="header-row">
-            <div>
-              <h2 className="section-title">Banner Images</h2>
-              <div className="subtle">
-                Upload banner images untuk event ini. Supported formats: JPG, PNG, GIF
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Total Events</p>
+                  <p className="text-3xl font-bold text-gray-900">{events.length}</p>
+                </div>
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Total Participants</p>
+                  <p className="text-3xl font-bold text-gray-900">{allRows.length}</p>
+                </div>
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Categories</p>
+                  <p className="text-3xl font-bold text-gray-900">{categories.length}</p>
+                </div>
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Active Banners</p>
+                  <p className="text-3xl font-bold text-gray-900">{banners.filter(b => b.active).length}</p>
+                </div>
               </div>
-            </div>
-          </div>
 
-          <div className="table-wrap">
-            <table className="f1-table compact">
-              <thead>
-                <tr>
-                  <th style={{ width: 120 }}>Preview</th>
-                  <th>Image URL / Alt Text</th>
-                  <th style={{ width: 80 }}>Order</th>
-                  <th style={{ width: 100 }}>Status</th>
-                  <th style={{ width: 150 }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {banners.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="empty">No banners uploaded yet</td>
-                  </tr>
-                ) : (
-                  banners
-                    .sort((a: any, b: any) => a.order - b.order)
-                    .map((banner: any) => (
-                      <tr key={banner.id} className="row-hover">
-                        <td>
-                          <img
-                            src={banner.imageUrl}
-                            alt={banner.alt || "Banner preview"}
-                            style={{ width: "100px", height: "60px", objectFit: "cover", borderRadius: "4px" }}
-                          />
-                        </td>
-                        <td>
-                          <div className="mono" style={{ fontSize: "11px", marginBottom: "4px" }}>
-                            {banner.imageUrl.slice(0, 50)}...
-                          </div>
-                          <div className="subtle">{banner.alt || "-"}</div>
-                        </td>
-                        <td className="mono">{banner.order}</td>
-                        <td>
-                          <span className={`badge ${banner.isActive ? 'badge-live' : 'badge-inactive'}`}>
-                            {banner.isActive ? "Active" : "Inactive"}
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", gap: "0.5rem" }}>
+              <div className="card">
+                <h2 className="text-2xl font-bold mb-4">Event Settings</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Event Title</label>
+                    <input
+                      type="text"
+                      value={eventTitle}
+                      onChange={(e) => setEventTitle(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    />
+                  </div>
+                  <button
+                    onClick={saveEventTitle}
+                    className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
+                  >
+                    Save Title
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeSection === 'events' && (
+            <>
+              <h1 className="text-3xl font-bold text-gray-900 mb-6">Events Management</h1>
+
+              <div className="card mb-6">
+                <h2 className="text-xl font-bold mb-4">Create New Event</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Event Name</label>
+                    <input
+                      type="text"
+                      value={newEventName}
+                      onChange={(e) => setNewEventName(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                    <input
+                      type="date"
+                      value={newEventDate}
+                      onChange={(e) => setNewEventDate(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                    <input
+                      type="text"
+                      value={newEventLocation}
+                      onChange={(e) => setNewEventLocation(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Latitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={newEventLatitude}
+                      onChange={(e) => setNewEventLatitude(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Longitude</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={newEventLongitude}
+                      onChange={(e) => setNewEventLongitude(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                    <textarea
+                      value={newEventDescription}
+                      onChange={(e) => setNewEventDescription(e.target.value)}
+                      rows={3}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-3">
+                  <button
+                    onClick={handleCreateEvent}
+                    className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
+                  >
+                    Create Event
+                  </button>
+                  <button
+                    onClick={() => setShowEventForm(false)}
+                    className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+
+              <div className="card">
+                <h2 className="text-xl font-bold mb-4">All Events ({events.length})</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Location</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {events.map((event) => (
+                        <tr key={event.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-3 px-4 font-medium">{event.name}</td>
+                          <td className="py-3 px-4">{event.date || '-'}</td>
+                          <td className="py-3 px-4">{event.location || '-'}</td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                              event.status === 'ongoing' ? 'bg-green-100 text-green-700' :
+                              event.status === 'completed' ? 'bg-gray-100 text-gray-700' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {event.status === 'ongoing' ? 'LIVE' : event.status === 'completed' ? 'SELESAI' : 'SEGERA'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeSection === 'csv' && (
+            <>
+              <h1 className="text-3xl font-bold text-gray-900 mb-6">Data Upload</h1>
+
+              <div className="card mb-6">
+                <h2 className="text-xl font-bold mb-4">Upload CSV Files</h2>
+                <p className="text-gray-600 mb-4">
+                  Upload Master CSV (wajib), Start CSV (opsional), Finish CSV (wajib), Checkpoint CSV (opsional).
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {(['master', 'start', 'finish', 'checkpoint'] as const).map((kind) => {
+                    const meta = csvMeta.find((m) => m.key === kind);
+                    return (
+                      <div key={kind} className="border border-gray-200 rounded-lg p-4">
+                        <h3 className="font-bold text-gray-900 capitalize mb-2">{kind}</h3>
+                        {meta ? (
+                          <div className="space-y-2">
+                            <p className="text-sm text-gray-600 line-clamp-1">{meta.filename}</p>
+                            <p className="text-xs text-gray-500">{meta.rows} rows</p>
                             <button
-                              className="btn ghost"
-                              onClick={() => toggleBannerActive(banner.id)}
-                            >
-                              {banner.isActive ? "Hide" : "Show"}
-                            </button>
-                            <button
-                              className="btn ghost"
-                              onClick={() => deleteBanner(banner.id, banner.imageUrl)}
+                              onClick={() => deleteCsv(kind)}
+                              className="w-full px-3 py-2 bg-red-50 text-red-600 rounded font-medium text-sm hover:bg-red-100 transition-colors"
                             >
                               Delete
                             </button>
                           </div>
-                        </td>
-                      </tr>
+                        ) : (
+                          <label className="block">
+                            <span className="w-full px-3 py-2 bg-gray-50 text-gray-600 rounded font-medium text-sm text-center block cursor-pointer hover:bg-gray-100 transition-colors">
+                              Choose File
+                            </span>
+                            <input
+                              type="file"
+                              accept=".csv"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) uploadCsv(kind, file);
+                              }}
+                              className="hidden"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="card">
+                <h2 className="text-xl font-bold mb-4">File Upload Status</h2>
+                <div className="space-y-2">
+                  {csvMeta.length === 0 ? (
+                    <p className="text-gray-500">Belum ada file CSV diupload.</p>
+                  ) : (
+                    csvMeta.map((m) => (
+                      <div key={m.key} className="flex items-center justify-between py-2 px-4 bg-gray-50 rounded">
+                        <div>
+                          <p className="font-medium text-gray-900 capitalize">{m.key}</p>
+                          <p className="text-sm text-gray-600">{m.filename}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-gray-900">{m.rows} rows</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(m.updatedAt).toLocaleString('id-ID')}
+                          </p>
+                        </div>
+                      </div>
                     ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
-          <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid #e5e7eb" }}>
-            <div className="subtle" style={{ marginBottom: "0.75rem", fontWeight: 500 }}>Upload New Banner</div>
-            <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setBannerFile(e.target.files?.[0] || null)}
-                style={{ flex: 1, minWidth: "200px" }}
-              />
-              <input
-                className="search"
-                style={{ width: "300px" }}
-                placeholder="Alt text (optional)"
-                value={bannerAlt}
-                onChange={(e) => setBannerAlt(e.target.value)}
-              />
-              <input
-                type="number"
-                className="search"
-                style={{ width: "100px" }}
-                placeholder="Order"
-                value={bannerOrder}
-                onChange={(e) => setBannerOrder(Number(e.target.value))}
-              />
-              <button
-                className="btn"
-                onClick={handleBannerUpload}
-                disabled={!bannerFile || uploadingBanner}
-              >
-                {uploadingBanner ? "Uploading..." : "Upload"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          {activeSection === 'banners' && (
+            <>
+              <h1 className="text-3xl font-bold text-gray-900 mb-6">Banner Management</h1>
 
-      {/* Category Management - Available for all events including default */}
-      <CategoryManager
-        eventId={eventId || 'default'}
-        onCategoriesChange={(newCategories) => {
-          setCategories(newCategories);
-          onConfigChanged();
-        }}
-      />
-
-      {/* Cut Off Time */}
-      <div className="card">
-        <div className="header-row">
-          <div>
-            <h2 className="section-title">Cut Off Settings</h2>
-            <div className="subtle">
-              Cut off time dihitung dari start masing-masing pelari / kategori.
-            </div>
-          </div>
-          <button className="btn ghost" onClick={logout}>
-            Logout
-          </button>
-        </div>
-
-        <div className="admin-cutoff">
-          <div className="label">Cut Off Duration (hours)</div>
-          <div className="tools">
-            <input
-              className="search"
-              placeholder="e.g. 3.5"
-              value={cutoffHours}
-              onChange={(e) => setCutoffHours(e.target.value)}
-            />
-            <button className="btn" onClick={applyCutoff}>
-              Save Cut Off
-            </button>
-          </div>
-          <div className="subtle">Jika kosong / 0 → cut off nonaktif.</div>
-        </div>
-      </div>
-
-      {/* Category Start Time Overrides */}
-      <div className="card">
-        <div className="header-row">
-          <div>
-            <h2 className="section-title">Category Start Times</h2>
-            <div className="subtle">
-              Set start time per kategori. Jika diisi, sistem akan menghitung{" "}
-              <b>total time = finish time - start time kategori</b>
-              untuk kategori tersebut (mengabaikan start time per peserta).
-            </div>
-          </div>
-          <button className="btn" onClick={applyCatStart}>
-            Save Start Times
-          </button>
-        </div>
-
-        <div className="table-wrap">
-          <table className="f1-table compact">
-            <thead>
-              <tr>
-                <th>Category</th>
-                <th>Start Time (datetime)</th>
-                <th style={{ width: 200 }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map((catKey) => (
-                <tr key={catKey} className="row-hover">
-                  <td className="name-cell">{catKey}</td>
-                  <td>
+              <div className="card mb-6">
+                <h2 className="text-xl font-bold mb-4">Upload New Banner</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Banner Image</label>
                     <input
-                      className="search"
-                      style={{ width: "100%" }}
-                      placeholder="contoh: 2025-11-23 07:00:00.000"
-                      value={catStart[catKey] || ""}
-                      onChange={(e) =>
-                        setCatStart((prev) => ({
-                          ...prev,
-                          [catKey]: e.target.value,
-                        }))
-                      }
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setBannerFile(e.target.files?.[0] || null)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
                     />
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                      <button
-                        className="btn ghost"
-                        onClick={() =>
-                          setCatStart((prev) => ({
-                            ...prev,
-                            [catKey]: formatNowAsTimestamp(),
-                          }))
-                        }
-                      >
-                        Set Now
-                      </button>
-                      <button
-                        className="btn ghost"
-                        onClick={() =>
-                          setCatStart((prev) => ({
-                            ...prev,
-                            [catKey]: "",
-                          }))
-                        }
-                      >
-                        Clear
-                      </button>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Alt Text</label>
+                    <input
+                      type="text"
+                      value={bannerAlt}
+                      onChange={(e) => setBannerAlt(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                      placeholder="Description for accessibility"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Order</label>
+                    <input
+                      type="number"
+                      value={bannerOrder}
+                      onChange={(e) => setBannerOrder(Number(e.target.value))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <button
+                    onClick={handleBannerUpload}
+                    disabled={uploadingBanner}
+                    className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {uploadingBanner ? 'Uploading...' : 'Upload Banner'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="card">
+                <h2 className="text-xl font-bold mb-4">All Banners ({banners.length})</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {banners.map((banner) => (
+                    <div key={banner.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <img
+                        src={banner.url}
+                        alt={banner.alt}
+                        className="w-full h-32 object-cover"
+                      />
+                      <div className="p-4">
+                        <p className="text-sm text-gray-600 mb-2">{banner.alt || 'No description'}</p>
+                        <p className="text-xs text-gray-500 mb-3">Order: {banner.order}</p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleToggleBannerActive(banner.id, banner.active)}
+                            className={`flex-1 px-3 py-2 rounded font-medium text-sm transition-colors ${
+                              banner.active
+                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {banner.active ? 'Active' : 'Inactive'}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBanner(banner.id)}
+                            className="px-3 py-2 bg-red-50 text-red-600 rounded font-medium text-sm hover:bg-red-100 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
-        <div className="subtle" style={{ marginTop: 8 }}>
-          Gunakan format tanggal &amp; jam yang sama dengan di CSV timing
-          (misal: <code>2025-11-23 07:00:00.000</code>). Kamu juga bisa klik <b>Set Now</b>
-          untuk mengisi otomatis berdasarkan jam saat ini. Jika kolom dikosongkan,
-          kategori tersebut akan kembali memakai start time per peserta dari CSV start (jika ada).
-        </div>
-      </div>
+          {activeSection === 'categories' && (
+            <>
+              <h1 className="text-3xl font-bold text-gray-900 mb-6">Category Management</h1>
+              <CategoryManager
+                eventId={eventId || 'default'}
+                onCategoriesChange={(newCats: string[]) => {
+                  setCategories(newCats);
+                  onConfigChanged();
+                }}
+              />
+            </>
+          )}
 
-      {/* DSQ Management */}
-      <div className="card">
-        <div className="header-row">
-          <div>
-            <h2 className="section-title">Disqualification (Manual)</h2>
-            <div className="subtle">
-              Toggle DSQ per runner (by EPC). DSQ tetap tampil di tabel tapi
-              tanpa rank.
-            </div>
-          </div>
-          <input
-            className="search"
-            placeholder="Search BIB / Name…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
+          {activeSection === 'timing' && (
+            <>
+              <h1 className="text-3xl font-bold text-gray-900 mb-6">Timing Configuration</h1>
 
-        <div className="table-wrap">
-          <table className="f1-table">
-            <thead>
-              <tr>
-                <th className="col-bib">BIB</th>
-                <th>NAME</th>
-                <th className="col-gender">GENDER</th>
-                <th className="col-cat">CATEGORY</th>
-                <th style={{ width: 120 }}>STATUS</th>
-                <th style={{ width: 120 }}>ACTION</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => {
-                const isDQ = !!dqMap[r.epc];
-                return (
-                  <tr key={r.epc} className="row-hover">
-                    <td className="mono">{r.bib}</td>
-                    <td className="name-cell">{r.name}</td>
-                    <td>{r.gender}</td>
-                    <td>{r.category}</td>
-                    <td className="mono strong">{isDQ ? "DSQ" : "OK"}</td>
-                    <td>
-                      <button
-                        className="btn ghost"
-                        onClick={() => toggleDQ(r.epc)}
-                      >
-                        {isDQ ? "Undo DSQ" : "Disqualify"}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="empty">
-                    Tidak ada peserta yang cocok.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              <div className="card mb-6">
+                <h2 className="text-xl font-bold mb-4">Cut-off Time (DNF)</h2>
+                <p className="text-gray-600 mb-4">
+                  Set waktu maksimum (dalam jam). Peserta yang melebihi waktu ini akan ditandai sebagai DNF (Did Not Finish).
+                </p>
+                <div className="flex gap-4 items-end">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Cut-off (jam)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={cutoffHours}
+                      onChange={(e) => setCutoffHours(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      const hours = parseFloat(cutoffHours);
+                      if (Number.isFinite(hours) && hours > 0) {
+                        saveCutoffMs(hours * 3600000);
+                        bumpDataVersion();
+                        onConfigChanged();
+                        alert("Cut-off time berhasil disimpan!");
+                      } else {
+                        saveCutoffMs(null);
+                        bumpDataVersion();
+                        onConfigChanged();
+                        alert("Cut-off time berhasil dihapus!");
+                      }
+                    }}
+                    className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+
+              <div className="card">
+                <h2 className="text-xl font-bold mb-4">Category Start Times</h2>
+                <p className="text-gray-600 mb-4">
+                  Set waktu start global per kategori (format: YYYY-MM-DD HH:MM:SS). Kosongkan untuk gunakan start time individual dari CSV.
+                </p>
+                <div className="space-y-4">
+                  {categories.map((cat) => (
+                    <div key={cat}>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">{cat}</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={catStart[cat] || ''}
+                          onChange={(e) => setCatStart(prev => ({ ...prev, [cat]: e.target.value }))}
+                          placeholder="YYYY-MM-DD HH:MM:SS"
+                          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                        />
+                        <button
+                          onClick={() => {
+                            saveCatStartMap(catStart);
+                            bumpDataVersion();
+                            onConfigChanged();
+                            alert("Start times berhasil disimpan!");
+                          }}
+                          className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeSection === 'dsq' && (
+            <>
+              <h1 className="text-3xl font-bold text-gray-900 mb-6">Disqualification (DQ)</h1>
+
+              <div className="card">
+                <p className="text-gray-600 mb-4">
+                  Masukkan nomor BIB untuk melakukan DSQ (disqualification). Peserta yang di-DQ tidak akan ditampilkan di leaderboard.
+                </p>
+
+                <div className="flex gap-4 mb-6">
+                  <input
+                    type="text"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Search NO BIB..."
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+
+                <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">BIB</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Time</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((r) => {
+                        const isDQ = !!dqMap[r.epc];
+                        return (
+                          <tr key={r.epc} className={`border-t border-gray-200 ${isDQ ? 'bg-red-50' : ''}`}>
+                            <td className="px-4 py-3 font-medium">{r.bib}</td>
+                            <td className="px-4 py-3">{r.name}</td>
+                            <td className="px-4 py-3">{r.totalTimeDisplay}</td>
+                            <td className="px-4 py-3">
+                              {isDQ ? (
+                                <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">DSQ</span>
+                              ) : (
+                                <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold">Active</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <button
+                                onClick={() => {
+                                  const newMap = { ...dqMap, [r.epc]: !isDQ };
+                                  setDqMap(newMap);
+                                  saveDQMap(newMap);
+                                  bumpDataVersion();
+                                  onConfigChanged();
+                                }}
+                                className={`px-3 py-1 rounded font-medium text-sm transition-colors ${
+                                  isDQ
+                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                    : 'bg-red-100 text-red-700 hover:bg-red-200'
+                                }`}
+                              >
+                                {isDQ ? 'Unduh' : 'DSQ'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {filtered.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                            No data found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-900">
+                    <strong>Info:</strong> Total {Object.values(dqMap).filter(Boolean).length} peserta di-DSQ.
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

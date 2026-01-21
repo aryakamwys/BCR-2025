@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { renderCertificatePNG, downloadDataUrl } from "../lib/certificate";
 
 type Props = {

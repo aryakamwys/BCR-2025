@@ -1,25 +1,34 @@
 // src/App.tsx
 
-import React, { useEffect, useMemo, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Routes, Route, Link } from "react-router-dom";
 import RaceClock from "./components/RaceClock";
 import CategorySection from "./components/CategorySection";
 import LeaderboardTable, { LeaderRow } from "./components/LeaderboardTable";
 import ParticipantModal from "./components/ParticipantModal";
-import AdminPage from "./components/AdminPage";
 import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
 import EventPage from "./pages/EventPage";
 import CreateEventPage from "./pages/CreateEventPage";
 import LandingPage from "./pages/LandingPage";
 import UserEventPage from "./pages/UserEventPage";
+import AdminLayout from "./components/admin/AdminLayout";
+import {
+  OverviewPageWrapper,
+  EventsPageWrapper,
+  DataPageWrapper,
+  BannersPageWrapper,
+  CategoriesPageWrapper,
+  TimingPageWrapper,
+  DQPageWrapper
+} from "./components/admin/wrappers";
 import { EventProvider, useEvent } from "./contexts/EventContext";
 import {
   loadMasterParticipants,
   loadTimesMap,
   loadCheckpointTimesMap,
 } from "./lib/data";
-import { CATEGORY_KEYS, DEFAULT_EVENT_TITLE, LS_EVENT_TITLE, LS_DATA_VERSION } from "./lib/config";
+import { DEFAULT_EVENT_TITLE, LS_EVENT_TITLE, LS_DATA_VERSION } from "./lib/config";
 import parseTimeToMs, { extractTimeOfDay, formatDuration } from "./lib/time";
 
 const LS_CUTOFF = "imr_cutoff_ms";
@@ -61,7 +70,7 @@ type LoadState =
 
 // Original Leaderboard App Component
 function LeaderboardApp() {
-  const { currentEvent, events, setCurrentEvent } = useEvent();
+  const { currentEvent, events, setCurrentEvent, loading: eventLoading } = useEvent();
   const [eventTitle, setEventTitle] = useState<string>(() => {
     return localStorage.getItem(LS_EVENT_TITLE) || DEFAULT_EVENT_TITLE;
   });
@@ -85,7 +94,29 @@ function LeaderboardApp() {
 
   const [recalcTick, setRecalcTick] = useState(0);
 
+  const eventId = currentEvent?.id || 'default';
+  
+  // Get categories from current event
+  const eventCategories: string[] = useMemo(() => {
+    return currentEvent?.categories || [];
+  }, [currentEvent?.categories]);
+
+  // Reset data and reload when event changes
   useEffect(() => {
+    if (currentEvent?.id) {
+      setHasLoadedOnce(false);
+      setRecalcTick(t => t + 1);
+      setActiveTab("Overall"); // Reset to Overall tab when switching events
+      // Update event title when switching events
+      setEventTitle(currentEvent.name || DEFAULT_EVENT_TITLE);
+    }
+  }, [currentEvent?.id, currentEvent?.name]);
+
+  useEffect(() => {
+    // Wait for event context to finish loading
+    if (eventLoading) {
+      return;
+    }
 
     (async () => {
       try {
@@ -96,7 +127,8 @@ function LeaderboardApp() {
           });
         }
 
-        const master = await loadMasterParticipants(currentEvent?.id || 'default');
+        console.log('[LeaderboardApp] Loading data for eventId:', eventId);
+        const master = await loadMasterParticipants(eventId);
 
         if (!hasLoadedOnce) {
           setState({
@@ -105,9 +137,9 @@ function LeaderboardApp() {
           });
         }
 
-        const startMap = await loadTimesMap("start", currentEvent?.id || 'default');
-        const finishMap = await loadTimesMap("finish", currentEvent?.id || 'default');
-        const cpMap = await loadCheckpointTimesMap(currentEvent?.id || 'default');
+        const startMap = await loadTimesMap("start", eventId);
+        const finishMap = await loadTimesMap("finish", eventId);
+        const cpMap = await loadCheckpointTimesMap(eventId);
         setCheckpointMap(cpMap);
 
         const cutoffMs = loadCutoffMs();
@@ -253,8 +285,9 @@ function LeaderboardApp() {
           list.forEach((r, i) => genderRankByEpc.set(r.epc, i + 1));
         });
 
+        // Use event-specific categories
         const categoryRankByEpc = new Map<string, number>();
-        CATEGORY_KEYS.forEach((catKey) => {
+        eventCategories.forEach((catKey: string) => {
           const list = finisherSorted.filter((r) => r.sourceCategoryKey === catKey);
           list.forEach((r, i) => categoryRankByEpc.set(r.epc, i + 1));
         });
@@ -270,8 +303,9 @@ function LeaderboardApp() {
           ...dsqs.map((r) => ({ ...r, rank: null })),
         ];
 
+        // Use event-specific categories for category map
         const catMap: Record<string, LeaderRow[]> = {};
-        CATEGORY_KEYS.forEach((catKey) => {
+        eventCategories.forEach((catKey: string) => {
           const list = overallFinal.filter((r) => r.sourceCategoryKey === catKey);
           catMap[catKey] = list;
         });
@@ -302,9 +336,9 @@ function LeaderboardApp() {
         }
       }
     })();
-  }, [recalcTick, hasLoadedOnce, currentEvent]);
+  }, [recalcTick, hasLoadedOnce, eventId, eventLoading, eventCategories]);
 
-  // 🔁 Refresh when Admin uploads CSV / changes title (cross-tab)
+  // Refresh when Admin uploads CSV / changes title (cross-tab)
   useEffect(() => {
     const onStorage = (ev: StorageEvent) => {
       if (ev.key === LS_DATA_VERSION) {
@@ -318,18 +352,20 @@ function LeaderboardApp() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  // Use event-specific categories for tabs
   const tabs = useMemo(
-    () => ["Overall", ...CATEGORY_KEYS, "Admin"],
-    []
+    () => ["Overall", ...eventCategories],
+    [eventCategories]
   );
 
-  // ✅ Jika data belum pernah berhasil dimuat (belum upload CSV),
-  // langsung arahkan user ke tab Admin agar bisa upload.
+  // Jika data belum pernah berhasil dimuat (belum upload CSV),
+  // tampilkan pesan error untuk upload CSV
   useEffect(() => {
     if (!hasLoadedOnce && state.status === "error") {
-      setActiveTab("Admin");
+      // Keep showing error state
     }
   }, [hasLoadedOnce, state.status]);
+  
   const onSelectParticipant = (row: LeaderRow) => {
     setSelected(row);
     setModalOpen(true);
@@ -356,17 +392,47 @@ function LeaderboardApp() {
     };
   }, [selected, checkpointMap]);
 
-  // ✅ Jangan memblokir UI ketika data belum ada:
+  // Jangan memblokir UI ketika data belum ada:
   // Admin harus tetap bisa diakses untuk upload CSV pertama kali.
   const needsFirstUpload = !hasLoadedOnce && (state.status === "loading" || state.status === "error");
 
-  // ✅ Setelah first load: UI selalu tampil, meskipun data lagi refresh di background
+  // Setelah first load: UI selalu tampil, meskipun data lagi refresh di background
   return (
     <>
-      <Navbar showAdminButton={true} onAdminClick={() => setActiveTab("Admin")} />
+      <Navbar showAdminButton={true} />
 
-      <div className="page">
-        <h1 className="app-title">{eventTitle}</h1>
+      <div className="flex">
+        {/* Events Sidebar */}
+        <aside className="w-64 min-h-screen bg-gray-50 border-r border-gray-200 p-4 hidden lg:block">
+          <h3 className="font-bold text-gray-900 mb-4 text-lg">Events</h3>
+          <div className="space-y-2">
+            {events.map((ev) => (
+              <button
+                key={ev.id}
+                onClick={() => setCurrentEvent(ev)}
+                className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                  currentEvent?.id === ev.id
+                    ? 'bg-red-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                <div className="font-semibold text-sm truncate">{ev.name}</div>
+                <div className={`text-xs mt-1 ${currentEvent?.id === ev.id ? 'text-red-100' : 'text-gray-500'}`}>
+                  {ev.location || 'No location'}
+                </div>
+              </button>
+            ))}
+            {events.length === 0 && (
+              <div className="text-gray-500 text-sm text-center py-4">
+                No events available
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <div className="flex-1 page">
+          <h1 className="app-title">{eventTitle}</h1>
 
       <div className="tabs">
         {tabs.map((t) => (
@@ -380,8 +446,8 @@ function LeaderboardApp() {
         ))}
       </div>
 
-      {/* ✅ Notice: first-time setup / missing upload */}
-      {needsFirstUpload && activeTab !== "Admin" && (
+      {/* Notice: first-time setup / missing upload */}
+      {needsFirstUpload && (
         <div className="card">
           <div className="error-title">Data belum siap</div>
           <div style={{ marginTop: 6 }}>
@@ -390,9 +456,9 @@ function LeaderboardApp() {
               : state.msg}
           </div>
           <div style={{ marginTop: 10 }}>
-            <button className="tab active" onClick={() => setActiveTab("Admin")}>
-              Buka Admin untuk Upload CSV
-            </button>
+            <Link to="/admin/overview" className="tab active">
+              Buka Admin Panel untuk Upload CSV
+            </Link>
           </div>
         </div>
       )}
@@ -418,7 +484,7 @@ function LeaderboardApp() {
       )}
 
 
-      {activeTab !== "Overall" && activeTab !== "Admin" && (
+      {activeTab !== "Overall" && (
         <>
           {state.status === "ready" || hasLoadedOnce ? (
             <>
@@ -431,19 +497,10 @@ function LeaderboardApp() {
             </>
           ) : (
             <div className="card">
-              Data belum tersedia. Buka tab <b>Admin</b> untuk upload CSV.
+              Data belum tersedia. Buka <Link to="/admin/overview" className="text-red-600 font-semibold hover:underline">Admin Panel</Link> untuk upload CSV.
             </div>
           )}
         </>
-      )}
-
-
-      {activeTab === "Admin" && (
-        <AdminPage
-          allRows={overall}
-          onConfigChanged={() => setRecalcTick((t) => t + 1)}
-          eventId={currentEvent?.id || 'default'}
-        />
       )}
 
       <ParticipantModal
@@ -451,7 +508,8 @@ function LeaderboardApp() {
         onClose={() => setModalOpen(false)}
         data={modalData}
       />
-    </div>
+        </div>
+      </div>
     </>
   );
 }
@@ -463,10 +521,20 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/leaderboard" element={<LeaderboardApp />} />
         <Route path="/event" element={<UserEventPage />} />
-
         <Route path="/admin/home" element={<HomePage />} />
         <Route path="/admin/create-event" element={<CreateEventPage />} />
         <Route path="/event/:slug" element={<EventPage />} />
+
+        {/* New Admin Routes with Layout */}
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route path="overview" element={<OverviewPageWrapper />} />
+          <Route path="events" element={<EventsPageWrapper />} />
+          <Route path="data" element={<DataPageWrapper />} />
+          <Route path="banners" element={<BannersPageWrapper />} />
+          <Route path="categories" element={<CategoriesPageWrapper />} />
+          <Route path="timing" element={<TimingPageWrapper />} />
+          <Route path="dq" element={<DQPageWrapper />} />
+        </Route>
       </Routes>
     </EventProvider>
   );

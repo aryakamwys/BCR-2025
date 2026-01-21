@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import Navbar from "../components/Navbar";
 import EventMap from "../components/EventMap";
 
@@ -116,6 +117,17 @@ export default function LandingPage() {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             {/* Left: Hero Content */}
             <div className="space-y-8 animate-fade-in">
+              {/* Running Animation Above Title */}
+              <div className="flex justify-start -ml-4">
+                <div className="w-48 h-48 md:w-64 md:h-64">
+                  <DotLottieReact
+                    src="https://lottie.host/a584c560-c949-418e-b49a-ee9c4217799d/x8OswG47qm.json"
+                    loop
+                    autoplay
+                  />
+                </div>
+              </div>
+              
               <div className="space-y-4">
                 <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-gray-900 leading-tight tracking-tight">
                   Run. Rank. <br />
@@ -395,6 +407,17 @@ export default function LandingPage() {
                 )}
               </div>
             ))}
+          </div>
+          
+          {/* Running Celebration Animation */}
+          <div className="flex justify-center mt-12">
+            <div className="w-64 h-64 md:w-80 md:h-80">
+              <DotLottieReact
+                src="https://lottie.host/07a5f32b-83de-4ae4-a8b6-5806d75d41fe/knAde8aQgL.lottie"
+                loop
+                autoplay
+              />
+            </div>
           </div>
         </div>
       </section>

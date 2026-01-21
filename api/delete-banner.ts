@@ -1,5 +1,5 @@
 import prisma from '../src/lib/prisma';
-import { deleteFile } from '../src/lib/vercelBlobStorage';
+import { deleteFileByUrl } from '../src/lib/fileStorage';
 
 interface APIEvent {
   httpMethod: string;
@@ -74,14 +74,8 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
     });
 
     try {
-      const url = new URL(imageUrl);
-      const pathParts = url.pathname.split('/');
-      const bucketIndex = pathParts.findIndex((part) => part === 'bcr-race-files');
-
-      if (bucketIndex !== -1 && bucketIndex < pathParts.length - 1) {
-        const path = pathParts.slice(bucketIndex + 1).join('/');
-        await deleteFile(path);
-      }
+      // Delete file using the URL directly
+      await deleteFileByUrl(imageUrl);
     } catch (storageError) {
       console.error('Failed to delete file from storage:', storageError);
     }

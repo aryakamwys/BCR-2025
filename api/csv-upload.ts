@@ -1,5 +1,4 @@
 import { uploadCsvFile } from '../src/lib/fileStorage';
-import prisma from '../src/lib/prisma';
 
 interface APIEvent {
   httpMethod: string;
@@ -51,23 +50,8 @@ export default async function handler(event: APIEvent): Promise<APIResponse> {
 
     const effectiveEventId = eventId || 'default';
 
-    let eventFolderName = effectiveEventId;
-    if (effectiveEventId !== 'default') {
-      try {
-        const eventRecord = await prisma.event.findUnique({
-          where: { id: effectiveEventId },
-          select: { name: true },
-        });
-        if (eventRecord?.name) {
-          eventFolderName = eventRecord.name
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-|-$/g, '');
-        }
-      } catch {
-        eventFolderName = effectiveEventId;
-      }
-    }
+    // Use eventId directly as folder name for consistency
+    const eventFolderName = effectiveEventId;
 
     const validKinds = ['master', 'start', 'finish', 'checkpoint'];
 

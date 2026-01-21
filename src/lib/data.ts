@@ -77,33 +77,20 @@ export type MasterParticipant = {
 };
 
 async function requireCsvText(kind: "master" | "finish", eventId: string = 'default'): Promise<string> {
-  // Try event-specific folder first
-  let file = await getCsvFile(kind, eventId);
-  
-  // Fallback to default folder if not found and eventId is not already default
-  if (!file?.text && eventId !== 'default') {
-    console.log(`[data] CSV '${kind}' not found for event '${eventId}', trying default folder`);
-    file = await getCsvFile(kind, 'default');
-  }
+  // Get CSV for this specific event only - NO fallback to default
+  const file = await getCsvFile(kind, eventId);
 
   if (!file?.text) {
     throw new Error(
-      `CSV '${kind}' belum diupload. Silakan login Admin → Upload CSV.`
+      `CSV '${kind}' belum diupload untuk event ini. Silakan login Admin → Upload CSV.`
     );
   }
   return file.text;
 }
 
 async function getCsvTextOptional(kind: "start" | "checkpoint", eventId: string = 'default'): Promise<string | null> {
-  // Try event-specific folder first
-  let file = await getCsvFile(kind, eventId);
-  
-  // Fallback to default folder if not found and eventId is not already default
-  if (!file?.text && eventId !== 'default') {
-    console.log(`[data] CSV '${kind}' not found for event '${eventId}', trying default folder`);
-    file = await getCsvFile(kind, 'default');
-  }
-  
+  // Get CSV for this specific event only - NO fallback to default
+  const file = await getCsvFile(kind, eventId);
   return file?.text || null;
 }
 
@@ -227,14 +214,8 @@ export async function loadTimesMap(kind: "start" | "finish",eventId: string = 'd
 }
 
 export async function loadCheckpointTimesMap(eventId: string = 'default'): Promise<Map<string, string[]>> {
-  // Try event-specific folder first
-  let file = await getCsvFile("checkpoint", eventId);
-  
-  // Fallback to default folder if not found and eventId is not already default
-  if (!file?.text && eventId !== 'default') {
-    console.log(`[data] CSV 'checkpoint' not found for event '${eventId}', trying default folder`);
-    file = await getCsvFile("checkpoint", 'default');
-  }
+  // Get CSV for this specific event only - NO fallback to default
+  const file = await getCsvFile("checkpoint", eventId);
   
   if (!file?.text) return new Map();
 

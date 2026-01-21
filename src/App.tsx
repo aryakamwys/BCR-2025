@@ -262,7 +262,12 @@ function LeaderboardApp() {
           });
         });
 
-        const finishers = baseRows.filter(
+        // Deduplicate by EPC to ensure unique participants
+        const uniqueRows = Array.from(
+          new Map(baseRows.map(r => [r.epc, r])).values()
+        );
+
+        const finishers = uniqueRows.filter(
           (r) => r.totalTimeDisplay !== "DNF" && r.totalTimeDisplay !== "DSQ"
         );
 
@@ -292,10 +297,10 @@ function LeaderboardApp() {
           list.forEach((r, i) => categoryRankByEpc.set(r.epc, i + 1));
         });
 
-        const dnfs = baseRows
+        const dnfs = uniqueRows
           .filter((r) => r.totalTimeDisplay === "DNF")
           .sort((a, b) => a.totalTimeMs - b.totalTimeMs);
-        const dsqs = baseRows.filter((r) => r.totalTimeDisplay === "DSQ");
+        const dsqs = uniqueRows.filter((r) => r.totalTimeDisplay === "DSQ");
 
         const overallFinal: LeaderRow[] = [
           ...finisherSorted,

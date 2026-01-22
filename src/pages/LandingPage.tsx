@@ -19,57 +19,15 @@ interface Event {
   status?: 'upcoming' | 'ongoing' | 'completed';
 }
 
-interface LeaderboardEntry {
-  rank: number;
-  name: string;
-  location: string;
-  time: string;
-  points: number;
-  category: string;
-}
-
 export default function LandingPage() {
   const navigate = useNavigate();
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
-  // Leaderboard state
-  const [timePeriod, setTimePeriod] = useState<'week' | 'month' | 'all'>('week');
-  const [selectedLocation, setSelectedLocation] = useState<'Jakarta' | 'Bandung' | 'Surabaya'>('Jakarta');
-  const [searchName, setSearchName] = useState('');
-
   // FAQ state
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [emailInput, setEmailInput] = useState('');
   const [showSignupForm, setShowSignupForm] = useState(false);
-
-  // Demo leaderboard data
-  const demoLeaderboard: LeaderboardEntry[] = [
-    { rank: 1, name: "Ahmad Rizki", location: "Jakarta", time: "42:15", points: 1250, category: "Full Marathon" },
-    { rank: 2, name: "Sarah Wijaya", location: "Surabaya", time: "43:22", points: 1180, category: "Full Marathon" },
-    { rank: 3, name: "Budi Santoso", location: "Bandung", time: "44:18", points: 1150, category: "Full Marathon" },
-    { rank: 4, name: "Dewi Lestari", location: "Jakarta", time: "45:30", points: 1100, category: "Full Marathon" },
-    { rank: 5, name: "Reza Pratama", location: "Surabaya", time: "46:45", points: 1050, category: "Full Marathon" },
-    { rank: 6, name: "Anita Kusuma", location: "Bandung", time: "47:22", points: 1020, category: "Half Marathon" },
-    { rank: 7, name: "Doni Setiawan", location: "Jakarta", time: "48:10", points: 980, category: "Half Marathon" },
-    { rank: 8, name: "Maya Sari", location: "Surabaya", time: "49:05", points: 950, category: "Half Marathon" },
-    { rank: 9, name: "Feri Irawan", location: "Bandung", time: "50:30", points: 920, category: "Half Marathon" },
-    { rank: 10, name: "Rina Marlina", location: "Jakarta", time: "51:15", points: 890, category: "Half Marathon" },
-  ];
-
-  // Filter leaderboard based on location and search
-  const filteredLeaderboard = demoLeaderboard
-    .filter(entry => entry.location === selectedLocation)
-    .filter(entry => !searchName || entry.name.toLowerCase().includes(searchName.toLowerCase()))
-    .slice(0, 10);
-
-  // Add user row if searching
-  const displayLeaderboard = searchName
-    ? [
-        ...filteredLeaderboard.filter(e => !e.name.toLowerCase().includes(searchName.toLowerCase())),
-        { rank: null, name: searchName, location: selectedLocation, time: "--:--", points: 0, category: "You" }
-      ]
-    : filteredLeaderboard;
 
   useEffect(() => {
     fetch('/api/events')
@@ -105,7 +63,7 @@ export default function LandingPage() {
     <>
       <Navbar />
 
-      {/* Hero Section - Live Leaderboard Preview */}
+      {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-gray-50 to-white min-h-screen flex items-center pt-20 overflow-hidden">
         {/* Background decoration */}
         <div className="absolute inset-0 overflow-hidden">
@@ -114,174 +72,59 @@ export default function LandingPage() {
         </div>
 
         <div className="relative max-w-7xl mx-auto px-6 lg:px-8 py-20 w-full">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            {/* Left: Hero Content */}
-            <div className="space-y-8 animate-fade-in">
-              {/* Running Animation Above Title */}
-              <div className="flex justify-start -ml-4">
-                <div className="w-48 h-48 md:w-64 md:h-64">
-                  <DotLottieReact
-                    src="https://lottie.host/a584c560-c949-418e-b49a-ee9c4217799d/x8OswG47qm.json"
-                    loop
-                    autoplay
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-gray-900 leading-tight tracking-tight">
-                  Run. Rank. <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-red-500">
-                    Be on the Board.
-                  </span>
-                </h1>
-                <p className="text-xl text-gray-600 leading-relaxed max-w-xl">
-                  Indonesia's running leaderboard + upcoming events map. Track your performance, discover races, and compete with runners nationwide.
-                </p>
-              </div>
-
-              {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button
-                  onClick={() => navigate('/leaderboard')}
-                  className="px-8 py-4 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-1"
-                >
-                  View Leaderboard
-                </button>
-                <button
-                  onClick={() => navigate('/event')}
-                  className="px-8 py-4 bg-white text-red-600 font-bold rounded-xl border-2 border-red-600 hover:bg-red-50 transition-all duration-300 shadow-md hover:shadow-lg"
-                >
-                  Find Events Near Me
-                </button>
-              </div>
-
-              {/* Stats */}
-              <div className="flex gap-8 pt-8 border-t border-gray-200">
-                <div>
-                  <div className="text-3xl font-bold text-gray-900">1,200+</div>
-                  <div className="text-sm text-gray-500">Runners Ranked</div>
-                </div>
-                <div>
-                  <div className="text-3xl font-bold text-gray-900">50+</div>
-                  <div className="text-sm text-gray-500">Events Listed</div>
-                </div>
-                <div>
-                  <div className="text-3xl font-bold text-gray-900">12</div>
-                  <div className="text-sm text-gray-500">Cities Covered</div>
-                </div>
+          <div className="max-w-3xl mx-auto text-center space-y-8 animate-fade-in">
+            {/* Running Animation Above Title */}
+            <div className="flex justify-center">
+              <div className="w-48 h-48 md:w-64 md:h-64">
+                <DotLottieReact
+                  src="https://lottie.host/a584c560-c949-418e-b49a-ee9c4217799d/x8OswG47qm.json"
+                  loop
+                  autoplay
+                />
               </div>
             </div>
 
-            {/* Right: Interactive Leaderboard Preview */}
-            <div className="animate-slide-up">
-              <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
-                {/* Leaderboard Header */}
-                <div className="bg-gradient-to-r from-red-600 to-red-500 px-6 py-4">
-                  <h3 className="text-white font-bold text-lg mb-4">Live Leaderboard Preview</h3>
+            <div className="space-y-4">
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-gray-900 leading-tight tracking-tight">
+                Run. Rank. <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-red-500">
+                  Be on the Board.
+                </span>
+              </h1>
+              <p className="text-xl text-gray-600 leading-relaxed max-w-xl mx-auto">
+                Indonesia's running leaderboard + upcoming events map. Track your performance, discover races, and compete with runners nationwide.
+              </p>
+            </div>
 
-                  {/* Time Period Tabs */}
-                  <div className="flex gap-2">
-                    {(['week', 'month', 'all'] as const).map((period) => (
-                      <button
-                        key={period}
-                        onClick={() => setTimePeriod(period)}
-                        className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-300 ${
-                          timePeriod === period
-                            ? 'bg-white text-red-600 shadow-md'
-                            : 'bg-red-700 text-white hover:bg-red-800'
-                        }`}
-                      >
-                        {period === 'week' ? 'This Week' : period === 'month' ? 'This Month' : 'All Time'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={() => navigate('/leaderboard')}
+                className="px-8 py-4 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-1"
+              >
+                View Leaderboard
+              </button>
+              <button
+                onClick={() => navigate('/event')}
+                className="px-8 py-4 bg-white text-red-600 font-bold rounded-xl border-2 border-red-600 hover:bg-red-50 transition-all duration-300 shadow-md hover:shadow-lg"
+              >
+                Find Events Near Me
+              </button>
+            </div>
 
-                {/* Location Chips */}
-                <div className="px-6 py-4 border-b border-gray-100 flex gap-2 flex-wrap">
-                  {(['Jakarta', 'Bandung', 'Surabaya'] as const).map((loc) => (
-                    <button
-                      key={loc}
-                      onClick={() => setSelectedLocation(loc)}
-                      className={`px-4 py-2 rounded-full font-semibold text-sm transition-all duration-300 ${
-                        selectedLocation === loc
-                          ? 'bg-red-600 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {loc}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Search Input */}
-                <div className="px-6 py-4 border-b border-gray-100">
-                  <input
-                    type="text"
-                    placeholder="Search your name..."
-                    value={searchName}
-                    onChange={(e) => setSearchName(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                  />
-                </div>
-
-                {/* Leaderboard Rows */}
-                <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
-                  {displayLeaderboard.map((entry, idx) => (
-                    <div
-                      key={idx}
-                      className={`px-6 py-4 hover:bg-gray-50 transition-colors duration-200 ${
-                        entry.category === 'You' ? 'bg-red-50 border-l-4 border-red-600' : ''
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          {/* Rank Badge */}
-                          {entry.rank !== null && (
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
-                              entry.rank === 1
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : entry.rank === 2
-                                ? 'bg-gray-100 text-gray-700'
-                                : entry.rank === 3
-                                ? 'bg-orange-100 text-orange-700'
-                                : 'bg-gray-50 text-gray-600'
-                            }`}>
-                              {entry.rank}
-                            </div>
-                          )}
-
-                          {entry.category === 'You' && (
-                            <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center">
-                              <span className="text-white text-xs">YOU</span>
-                            </div>
-                          )}
-
-                          <div>
-                            <div className="font-bold text-gray-900">{entry.name}</div>
-                            <div className="text-sm text-gray-500">{entry.location} • {entry.category}</div>
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <div className="font-bold text-gray-900">{entry.time}</div>
-                          <div className="text-sm text-gray-500">{entry.points} pts</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* View All Link */}
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
-                  <button
-                    onClick={() => navigate('/leaderboard')}
-                    className="w-full text-center text-red-600 font-bold hover:text-red-700 transition-colors"
-                  >
-                    View Full Leaderboard →
-                  </button>
-                </div>
+            {/* Stats */}
+            <div className="flex justify-center gap-8 pt-8 border-t border-gray-200">
+              <div>
+                <div className="text-3xl font-bold text-gray-900">1,200+</div>
+                <div className="text-sm text-gray-500">Runners Ranked</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-gray-900">50+</div>
+                <div className="text-sm text-gray-500">Events Listed</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-gray-900">12</div>
+                <div className="text-sm text-gray-500">Cities Covered</div>
               </div>
             </div>
           </div>

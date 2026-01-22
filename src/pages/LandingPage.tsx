@@ -550,7 +550,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-6 sm:mt-8 pt-6 sm:pt-8 text-center text-xs sm:text-sm">
-            © 2025 BIP Runner. All rights reserved.
+            © 2026 BIP Runner. All rights reserved.
           </div>
         </div>
       </footer>

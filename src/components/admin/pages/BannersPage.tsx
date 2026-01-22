@@ -115,16 +115,17 @@ export default function BannersPage({ banners, eventId, onBannersChange }: Banne
     <>
       {/* Banner Images */}
       <div className="card">
-        <div className="header-row">
+        <div className="header-row mb-4">
           <div>
             <h2 className="section-title">Banner Images</h2>
-            <div className="subtle">
+            <div className="subtle text-sm">
               Upload banner images untuk event ini. Supported formats: JPG, PNG, GIF
             </div>
           </div>
         </div>
 
-        <div className="table-wrap">
+        {/* Desktop Table - hidden on mobile */}
+        <div className="hidden md:block table-wrap">
           <table className="f1-table compact">
             <thead>
               <tr>
@@ -194,38 +195,105 @@ export default function BannersPage({ banners, eventId, onBannersChange }: Banne
           </table>
         </div>
 
-        <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid #e5e7eb" }}>
-          <div className="subtle" style={{ marginBottom: "0.75rem", fontWeight: 500 }}>Upload New Banner</div>
-          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-            <input
-              id="banner-upload"
-              type="file"
-              accept="image/*"
-              onChange={(e) => setBannerFile(e.target.files?.[0] || null)}
-              style={{ flex: 1, minWidth: "200px" }}
-            />
-            <input
-              className="search"
-              style={{ width: "300px" }}
-              placeholder="Alt text (optional)"
-              value={bannerAlt}
-              onChange={(e) => setBannerAlt(e.target.value)}
-            />
-            <input
-              type="number"
-              className="search"
-              style={{ width: "100px" }}
-              placeholder="Order"
-              value={bannerOrder}
-              onChange={(e) => setBannerOrder(Number(e.target.value))}
-            />
-            <button
-              className="btn"
-              onClick={handleBannerUpload}
-              disabled={!bannerFile || uploadingBanner}
-            >
-              {uploadingBanner ? "Uploading..." : "Upload"}
-            </button>
+        {/* Mobile Cards - visible only on mobile */}
+        <div className="md:hidden space-y-3">
+          {banners.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">No banners uploaded yet</div>
+          ) : (
+            banners
+              .sort((a: any, b: any) => a.order - b.order)
+              .map((banner: any) => (
+                <div key={banner.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+                  {/* Banner Image Preview */}
+                  <img
+                    src={banner.imageUrl}
+                    alt={banner.alt || "Banner preview"}
+                    className="w-full h-32 object-cover"
+                  />
+                  
+                  <div className="p-3">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-600 truncate">{banner.alt || "No description"}</p>
+                        <p className="text-xs text-gray-400 mono">Order: {banner.order}</p>
+                      </div>
+                      <span
+                        className="px-2 py-1 rounded-full text-xs font-bold ml-2"
+                        style={{
+                          background: banner.isActive ? '#dcfce7' : '#f3f4f6',
+                          color: banner.isActive ? '#166534' : '#6b7280',
+                        }}
+                      >
+                        {banner.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <button
+                        className="btn ghost flex-1 text-sm"
+                        onClick={() => toggleBannerActive(banner.id)}
+                      >
+                        {banner.isActive ? "Hide" : "Show"}
+                      </button>
+                      <button
+                        className="btn ghost flex-1 text-sm"
+                        onClick={() => deleteBanner(banner.id, banner.imageUrl)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+          )}
+        </div>
+
+        {/* Upload Form */}
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="subtle mb-3 font-medium">Upload New Banner</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="md:col-span-2">
+              <label className="block">
+                <span className="sr-only">Choose banner image</span>
+                <input
+                  id="banner-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setBannerFile(e.target.files?.[0] || null)}
+                  className="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-lg file:border-0
+                    file:text-sm file:font-medium
+                    file:bg-gray-100 file:text-gray-700
+                    hover:file:bg-gray-200
+                    cursor-pointer"
+                />
+              </label>
+            </div>
+            <div>
+              <input
+                className="search w-full"
+                placeholder="Alt text (optional)"
+                value={bannerAlt}
+                onChange={(e) => setBannerAlt(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-3">
+              <input
+                type="number"
+                className="search w-24"
+                placeholder="Order"
+                value={bannerOrder}
+                onChange={(e) => setBannerOrder(Number(e.target.value))}
+              />
+              <button
+                className="btn flex-1"
+                onClick={handleBannerUpload}
+                disabled={!bannerFile || uploadingBanner}
+              >
+                {uploadingBanner ? "Uploading..." : "Upload"}
+              </button>
+            </div>
           </div>
         </div>
       </div>

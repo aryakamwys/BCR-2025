@@ -135,27 +135,27 @@ export default function DataPage({ csvMeta, eventId, onCsvChange, onDataVersionB
     <>
       {/* CSV Upload */}
       <div className="card">
-        <div className="header-row">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
           <div>
-            <h2 className="section-title">CSV Upload (Master / Start / Finish / Checkpoint)</h2>
-            <div className="subtle">
-              Data timing sekarang berasal dari file CSV upload (bukan Google Sheet).
+            <h2 className="section-title">CSV Upload</h2>
+            <div className="subtle text-sm">
+              Data timing sekarang berasal dari file CSV upload.
               <b> Master &amp; Finish wajib</b>. <b>Start tidak wajib</b> jika kamu memakai
-              <b> Category Start Times</b> (start global per kategori) di Timing page.
-              Checkpoint optional.
+              <b> Category Start Times</b> di Timing page.
             </div>
           </div>
-          <div className="tools">
-            <button className="btn ghost" onClick={onCsvChange}>
-              Refresh Status
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button className="btn ghost w-full sm:w-auto text-sm" onClick={onCsvChange}>
+              Refresh
             </button>
-            <button className="btn" onClick={clearAllCsv}>
-              Reset Uploaded CSV
+            <button className="btn w-full sm:w-auto text-sm" onClick={clearAllCsv}>
+              Reset All
             </button>
           </div>
         </div>
 
-        <div className="table-wrap">
+        {/* Desktop Table - hidden on mobile */}
+        <div className="hidden md:block table-wrap">
           <table className="f1-table compact">
             <thead>
               <tr>
@@ -196,12 +196,77 @@ export default function DataPage({ csvMeta, eventId, onCsvChange, onDataVersionB
           </table>
         </div>
 
-        <div className="subtle" style={{ marginTop: 8 }}>
+        {/* Mobile Cards - visible only on mobile */}
+        <div className="md:hidden space-y-3">
+          {(["master", "start", "finish", "checkpoint"] as CsvKind[]).map((kind) => {
+            const meta = metaByKind[kind];
+            const isRequired = kind === "master" || kind === "finish";
+            return (
+              <div key={kind} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                <div className="flex justify-between items-center mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="mono font-bold text-gray-900">{kind.toUpperCase()}</span>
+                    {isRequired && (
+                      <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">Required</span>
+                    )}
+                  </div>
+                  {meta ? (
+                    <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">
+                      Uploaded
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
+                      Empty
+                    </span>
+                  )}
+                </div>
+                
+                {meta && (
+                  <div className="text-sm text-gray-600 mb-3 space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">File:</span>
+                      <span className="mono truncate max-w-[180px]">{meta.filename}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Rows:</span>
+                      <span className="mono">{meta.rows}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Updated:</span>
+                      <span className="mono text-xs">{new Date(meta.updatedAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+
+                <label className="block">
+                  <span className="sr-only">Upload {kind} CSV</span>
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="block w-full text-sm text-gray-500
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-lg file:border-0
+                      file:text-sm file:font-medium
+                      file:bg-gray-100 file:text-gray-700
+                      hover:file:bg-gray-200
+                      cursor-pointer"
+                    onChange={(e) => {
+                      const f = (e.target as HTMLInputElement).files?.[0];
+                      if (f) uploadCsv(kind, f);
+                    }}
+                  />
+                </label>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="subtle text-sm mt-4">
           Format kolom minimal:
-          <ul style={{ marginTop: 6, marginBottom: 0 }}>
-            <li><b>Master</b>: EPC, Nama, Kelamin, Kategori, BIB (mis: BIB Number)</li>
-            <li><b>Finish / Checkpoint</b>: EPC, Times (atau Time / Timestamp)</li>
-            <li><b>Start</b>: optional (bisa pakai Category Start Times). Jika dipakai: EPC, Times (atau Time / Timestamp)</li>
+          <ul className="mt-2 ml-4 space-y-1">
+            <li><b>Master</b>: EPC, Nama, Kelamin, Kategori, BIB</li>
+            <li><b>Finish / Checkpoint</b>: EPC, Times</li>
+            <li><b>Start</b>: optional (EPC, Times)</li>
           </ul>
         </div>
       </div>

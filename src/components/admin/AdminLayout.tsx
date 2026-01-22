@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Layout, Button, Dropdown, Avatar, Input } from 'antd';
-import { MenuFoldOutlined, MenuUnfoldOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons';
+import { MenuFoldOutlined, MenuUnfoldOutlined, UserOutlined, LogoutOutlined, CloseOutlined } from '@ant-design/icons';
 import { Outlet, useNavigate } from 'react-router-dom';
 import AppSidebar, { defaultMenuItems } from './AppSidebar';
 
@@ -20,6 +20,8 @@ function saveAuth(v: boolean) {
 
 export default function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authed, setAuthed] = useState(loadAuth());
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
@@ -33,11 +35,14 @@ export default function AdminLayout() {
     }
   }, [authed]);
 
-  // Responsive behavior - collapse on mobile by default
+  // Responsive behavior - detect mobile and collapse sidebar
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 768) {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) {
         setCollapsed(true);
+        setMobileMenuOpen(false);
       } else {
         setCollapsed(false);
       }
@@ -50,6 +55,13 @@ export default function AdminLayout() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Close mobile menu when navigating
+  useEffect(() => {
+    if (isMobile) {
+      setMobileMenuOpen(false);
+    }
+  }, [navigate]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,22 +166,67 @@ export default function AdminLayout() {
     );
   }
 
+  // Toggle mobile menu
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen);
+  };
+
+  // Handle sidebar item click on mobile (close menu)
+  const handleMobileNavigation = () => {
+    if (isMobile) {
+      setMobileMenuOpen(false);
+    }
+  };
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      {/* Sidebar */}
-      <AppSidebar collapsed={collapsed} menuItems={defaultMenuItems} />
+      {/* Mobile Overlay */}
+      {isMobile && mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - Only render when: desktop OR (mobile AND menu open) */}
+      {(!isMobile || mobileMenuOpen) && (
+        <div className={`
+          ${isMobile ? 'fixed z-50' : ''}
+        `}>
+          <AppSidebar 
+            collapsed={isMobile ? false : collapsed} 
+            menuItems={defaultMenuItems}
+            onItemClick={handleMobileNavigation}
+          />
+          {/* Mobile close button */}
+          {isMobile && (
+            <Button
+              type="text"
+              icon={<CloseOutlined />}
+              onClick={() => setMobileMenuOpen(false)}
+              className="absolute top-4 right-2 z-50"
+              style={{
+                fontSize: '16px',
+                width: 40,
+                height: 40,
+                color: '#666',
+              }}
+            />
+          )}
+        </div>
+      )}
 
       {/* Main Content */}
       <Layout
         style={{
-          marginLeft: collapsed ? 80 : 256,
+          marginLeft: isMobile ? 0 : (collapsed ? 80 : 256),
           transition: 'margin-left 0.2s',
         }}
       >
         {/* Header */}
         <Header
           style={{
-            padding: '0 24px',
+            padding: isMobile ? '0 12px' : '0 24px',
             background: '#fff',
             borderBottom: '1px solid #f0f0f0',
             display: 'flex',
@@ -180,11 +237,11 @@ export default function AdminLayout() {
             zIndex: 10,
           }}
         >
-          {/* Collapse Button */}
+          {/* Menu/Collapse Button */}
           <Button
             type="text"
-            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            onClick={() => setCollapsed(!collapsed)}
+            icon={isMobile ? <MenuUnfoldOutlined /> : (collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />)}
+            onClick={isMobile ? toggleMobileMenu : () => setCollapsed(!collapsed)}
             style={{
               fontSize: '16px',
               width: 48,
@@ -192,9 +249,21 @@ export default function AdminLayout() {
             }}
           />
 
+          {/* Mobile: Show logo in header */}
+          {isMobile && (
+            <div className="flex items-center gap-2">
+              <img
+                src="/Assets/logo.png"
+                alt="Logo"
+                className="h-8 w-auto object-contain"
+              />
+              <span className="font-semibold text-gray-900">Admin</span>
+            </div>
+          )}
+
           {/* User Menu */}
           <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-            <div className="flex items-center gap-3 cursor-pointer">
+            <div className="flex items-center gap-2 cursor-pointer">
               <Avatar size="default" icon={<UserOutlined />} className="bg-red-500" />
               <span className="text-gray-700 font-medium hidden sm:block">Admin</span>
             </div>
@@ -204,8 +273,8 @@ export default function AdminLayout() {
         {/* Page Content */}
         <Content
           style={{
-            margin: '24px 24px 0',
-            padding: 24,
+            margin: isMobile ? '12px 12px 0' : '24px 24px 0',
+            padding: isMobile ? 12 : 24,
             minHeight: 280,
             background: '#f0f2f5',
           }}

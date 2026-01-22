@@ -162,47 +162,84 @@ body {
 
 .table-wrap {
   overflow-x: auto;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid var(--line);
-  margin-top: 10px;
+  margin-top: 8px;
+  -webkit-overflow-scrolling: touch; /* iOS smooth scroll */
 }
 
 .f1-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 700px;
+  min-width: 600px;
   background: #fff;
 }
 
 @media (min-width: 768px) {
   .f1-table {
-    min-width: 860px;
+    min-width: 700px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .f1-table {
+    min-width: 850px;
   }
 }
 
 .f1-table.compact {
-  min-width: 520px;
+  min-width: 400px;
 }
 
 .f1-table thead th {
-  font-size: 12px;
-  letter-spacing: 0.7px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--muted);
   text-align: left;
   background: #fafafa;
   border-bottom: 1px solid var(--line);
-  padding: 10px 10px;
+  padding: 8px 6px;
+  white-space: nowrap;
   position: sticky;
   top: 0;
   z-index: 1;
 }
 
+@media (min-width: 640px) {
+  .f1-table thead th {
+    font-size: 11px;
+    padding: 10px 8px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .f1-table thead th {
+    font-size: 12px;
+    padding: 10px 10px;
+  }
+}
+
 .f1-table tbody td {
-  padding: 10px 10px;
+  padding: 8px 6px;
   border-bottom: 1px solid var(--line);
-  font-size: 14px;
+  font-size: 12px;
   vertical-align: middle;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .f1-table tbody td {
+    padding: 9px 8px;
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .f1-table tbody td {
+    padding: 10px 10px;
+    font-size: 14px;
+  }
 }
 
 .row-hover:hover td {
@@ -210,19 +247,98 @@ body {
 }
 
 .col-rank {
-  width: 70px;
+  width: 50px;
+  min-width: 50px;
 }
+
+@media (min-width: 640px) {
+  .col-rank {
+    width: 60px;
+    min-width: 60px;
+  }
+}
+
+@media (min-width: 768px) {
+  .col-rank {
+    width: 70px;
+    min-width: 70px;
+  }
+}
+
 .col-bib {
-  width: 90px;
+  width: 65px;
+  min-width: 65px;
 }
+
+@media (min-width: 640px) {
+  .col-bib {
+    width: 75px;
+    min-width: 75px;
+  }
+}
+
+@media (min-width: 768px) {
+  .col-bib {
+    width: 90px;
+    min-width: 90px;
+  }
+}
+
 .col-gender {
-  width: 110px;
+  width: 70px;
+  min-width: 70px;
 }
+
+@media (min-width: 640px) {
+  .col-gender {
+    width: 85px;
+    min-width: 85px;
+  }
+}
+
+@media (min-width: 768px) {
+  .col-gender {
+    width: 110px;
+    min-width: 110px;
+  }
+}
+
 .col-cat {
-  width: 180px;
+  width: 120px;
+  min-width: 120px;
 }
+
+@media (min-width: 640px) {
+  .col-cat {
+    width: 140px;
+    min-width: 140px;
+  }
+}
+
+@media (min-width: 768px) {
+  .col-cat {
+    width: 180px;
+    min-width: 180px;
+  }
+}
+
 .col-time {
-  width: 150px;
+  width: 100px;
+  min-width: 100px;
+}
+
+@media (min-width: 640px) {
+  .col-time {
+    width: 120px;
+    min-width: 120px;
+  }
+}
+
+@media (min-width: 768px) {
+  .col-time {
+    width: 150px;
+    min-width: 150px;
+  }
 }
 
 .mono {

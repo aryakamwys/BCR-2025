@@ -161,55 +161,50 @@ export default function CategoryManager({ eventId, onCategoriesChange }: Categor
 
   return (
     <div className="card">
-      <div className="header-row">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
           <h2 className="section-title">Category Management</h2>
-          <div className="subtle">
+          <div className="subtle text-sm">
             {eventId === 'default' 
               ? 'Select or create an event first to save categories to database.' 
               : 'Add, edit, reorder race categories. Changes will be saved to database.'}
           </div>
         </div>
-        <button className="btn" onClick={saveCategories} disabled={saving || eventId === 'default'}>
+        <button className="btn w-full sm:w-auto" onClick={saveCategories} disabled={saving || eventId === 'default'}>
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
 
       {showMessage && (
-        <div style={{
-          padding: '0.75rem 1rem',
-          borderRadius: '6px',
-          marginBottom: '1rem',
-          fontSize: '0.9rem',
-          fontWeight: '500',
-          background: messageType === 'success' ? '#d1fae5' : '#fef2f2',
-          color: messageType === 'success' ? '#065f46' : '#991b1b',
-          border: `1px solid ${messageType === 'success' ? '#10b981' : '#dc2626'}`,
-        }}>
+        <div className={`p-3 rounded-lg mb-4 text-sm font-medium ${
+          messageType === 'success' 
+            ? 'bg-green-100 text-green-800 border border-green-500' 
+            : 'bg-red-100 text-red-800 border border-red-500'
+        }`}>
           {messageText}
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
         <input
           type="text"
           value={newCategory}
           onChange={(e) => setNewCategory(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
           placeholder="e.g., 10K Laki-laki"
-          className="search"
-          style={{ flex: 1 }}
+          className="search flex-1"
         />
         <button
           onClick={handleAddCategory}
-          className="btn"
+          className="btn w-full sm:w-auto"
           disabled={!newCategory.trim()}
         >
           + Add Category
         </button>
       </div>
 
-      <div className="table-wrap">
+      {/* Desktop Table - hidden on mobile */}
+      <div className="hidden md:block table-wrap">
         <table className="f1-table compact">
           <thead>
             <tr>
@@ -332,6 +327,88 @@ export default function CategoryManager({ eventId, onCategoriesChange }: Categor
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Cards - visible only on mobile */}
+      <div className="md:hidden space-y-2">
+        {categories.length === 0 ? (
+          <div className="text-center text-gray-500 py-8">
+            No categories yet. Add your first category above.
+          </div>
+        ) : (
+          categories.map((category, index) => (
+            <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+              {editingIndex === index ? (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit()}
+                    className="search w-full"
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={handleSaveEdit} className="btn flex-1 text-sm">
+                      Save
+                    </button>
+                    <button onClick={handleCancelEdit} className="btn ghost flex-1 text-sm">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex flex-col gap-1">
+                      <button
+                        onClick={() => handleMoveUp(index)}
+                        disabled={index === 0}
+                        className={`w-6 h-6 rounded text-xs flex items-center justify-center ${
+                          index === 0 
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                            : 'bg-indigo-500 text-white'
+                        }`}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        onClick={() => handleMoveDown(index)}
+                        disabled={index === categories.length - 1}
+                        className={`w-6 h-6 rounded text-xs flex items-center justify-center ${
+                          index === categories.length - 1 
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                            : 'bg-indigo-500 text-white'
+                        }`}
+                      >
+                        ↓
+                      </button>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-900">{category}</span>
+                      <div className="text-xs text-gray-400">#{index + 1}</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleStartEdit(index)}
+                      className="btn ghost text-sm px-3"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCategory(index)}
+                      className="btn ghost text-sm px-3"
+                      style={{ color: '#dc2626' }}
+                    >
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

@@ -98,14 +98,14 @@ export default function TimingPage({
     <>
       {/* Cut Off Time */}
       <div className="card">
-        <div className="header-row">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div>
             <h2 className="section-title">Cut Off Settings</h2>
-            <div className="subtle">
+            <div className="subtle text-sm">
               Cut off time dihitung dari start masing-masing pelari / kategori.
             </div>
           </div>
-          <button className="btn" onClick={applyCutoff}>
+          <button className="btn w-full sm:w-auto" onClick={applyCutoff}>
             Save Cut Off
           </button>
         </div>
@@ -114,33 +114,33 @@ export default function TimingPage({
           <div className="label">Cut Off Duration (hours)</div>
           <div className="tools">
             <input
-              className="search"
+              className="search w-full"
               placeholder="e.g. 3.5"
               value={cutoffHours}
               onChange={(e) => setCutoffHours(e.target.value)}
             />
           </div>
-          <div className="subtle">Jika kosong / 0 → cut off nonaktif.</div>
+          <div className="subtle text-sm mt-2">Jika kosong / 0 → cut off nonaktif.</div>
         </div>
       </div>
 
       {/* Category Start Time Overrides */}
       <div className="card">
-        <div className="header-row">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div>
             <h2 className="section-title">Category Start Times</h2>
-            <div className="subtle">
+            <div className="subtle text-sm">
               Set start time per kategori. Jika diisi, sistem akan menghitung{" "}
-              <b>total time = finish time - start time kategori</b>
-              untuk kategori tersebut (mengabaikan start time per peserta).
+              <b>total time = finish time - start time kategori</b>.
             </div>
           </div>
-          <button className="btn" onClick={applyCatStart}>
+          <button className="btn w-full sm:w-auto" onClick={applyCatStart}>
             Save Start Times
           </button>
         </div>
 
-        <div className="table-wrap">
+        {/* Desktop Table - hidden on mobile */}
+        <div className="hidden md:block table-wrap">
           <table className="f1-table compact">
             <thead>
               <tr>
@@ -205,11 +205,58 @@ export default function TimingPage({
           </table>
         </div>
 
-        <div className="subtle" style={{ marginTop: 8 }}>
+        {/* Mobile Cards - visible only on mobile */}
+        <div className="md:hidden space-y-3">
+          {categories.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">No categories defined yet.</div>
+          ) : (
+            categories.map((catKey) => (
+              <div key={catKey} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                <div className="font-medium text-gray-900 mb-2">{catKey}</div>
+                <input
+                  className="search w-full mb-2 text-sm"
+                  placeholder="2025-11-23 07:00:00.000"
+                  value={catStart[catKey] || ""}
+                  onChange={(e) =>
+                    setCatStart((prev) => ({
+                      ...prev,
+                      [catKey]: e.target.value,
+                    }))
+                  }
+                />
+                <div className="flex gap-2">
+                  <button
+                    className="btn ghost flex-1 text-sm"
+                    onClick={() =>
+                      setCatStart((prev) => ({
+                        ...prev,
+                        [catKey]: formatNowAsTimestamp(),
+                      }))
+                    }
+                  >
+                    Set Now
+                  </button>
+                  <button
+                    className="btn ghost flex-1 text-sm"
+                    onClick={() =>
+                      setCatStart((prev) => ({
+                        ...prev,
+                        [catKey]: "",
+                      }))
+                    }
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="subtle text-sm mt-4">
           Gunakan format tanggal &amp; jam yang sama dengan di CSV timing
           (misal: <code>2025-11-23 07:00:00.000</code>). Kamu juga bisa klik <b>Set Now</b>
-          untuk mengisi otomatis berdasarkan jam saat ini. Jika kolom dikosongkan,
-          kategori tersebut akan kembali memakai start time per peserta dari CSV start (jika ada).
+          untuk mengisi otomatis berdasarkan jam saat ini.
         </div>
       </div>
     </>

@@ -23,9 +23,10 @@ interface MenuItem {
 interface AppSidebarProps {
   collapsed: boolean;
   menuItems: MenuItem[];
+  onItemClick?: () => void;
 }
 
-export default function AppSidebar({ collapsed, menuItems }: AppSidebarProps) {
+export default function AppSidebar({ collapsed, menuItems, onItemClick }: AppSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [openKeys, setOpenKeys] = useState<string[]>([]);
@@ -80,6 +81,8 @@ export default function AppSidebar({ collapsed, menuItems }: AppSidebarProps) {
     } else if (item?.path) {
       // Navigate to path
       navigate(item.path);
+      // Notify parent (for mobile menu close)
+      onItemClick?.();
     }
   };
 

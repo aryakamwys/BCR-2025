@@ -14,7 +14,7 @@ export default function CategoriesPage({
 }: CategoriesPageProps) {
   return (
     <>
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Category Management</h1>
+      <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-4 md:mb-6">Category Management</h1>
       <CategoryManager
         eventId={eventId}
         onCategoriesChange={(newCats: string[]) => {

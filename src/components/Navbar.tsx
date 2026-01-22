@@ -19,15 +19,15 @@ export default function Navbar({ showAdminButton = false }: NavbarProps) {
 
   return (
     <nav className="bg-white border-b-2 border-red-500 shadow-md sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16 md:h-20">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-14 md:h-16 lg:h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
-            <img src="/Assets/logo2.gif" alt="Logo" className="h-16 md:h-24 lg:h-32 w-auto object-contain" />
+            <img src="/Assets/logo2.gif" alt="Logo" className="h-10 sm:h-12 md:h-16 lg:h-20 w-auto object-contain" />
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-4 lg:gap-6">
+          <div className="hidden md:flex items-center gap-3 lg:gap-4">
             {navLinks.map((link) => (
               <Link
                 key={link.to}
@@ -46,7 +46,7 @@ export default function Navbar({ showAdminButton = false }: NavbarProps) {
             {showAdminButton && (
               <Link
                 to="/admin/overview"
-                className="px-4 py-2 text-sm font-semibold bg-accent text-white rounded-lg hover:bg-red-600 hover:-translate-y-0.5 transition-all shadow-sm"
+                className="px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold bg-accent text-white rounded-lg hover:bg-red-600 hover:-translate-y-0.5 transition-all shadow-sm"
               >
                 Admin
               </Link>
@@ -56,15 +56,15 @@ export default function Navbar({ showAdminButton = false }: NavbarProps) {
           {/* Mobile Hamburger Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
+            className="md:hidden p-1.5 sm:p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             ) : (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             )}

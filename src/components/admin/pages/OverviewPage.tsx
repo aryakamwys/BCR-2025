@@ -71,59 +71,34 @@ export default function OverviewPage({ allRows, eventId, onConfigChanged }: Over
           </div>
         </div>
 
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
-          gap: '12px', 
-          marginTop: '16px' 
-        }}>
-          <div style={{ 
-            background: '#fafafa', 
-            border: '1px solid var(--line)', 
-            borderRadius: '10px', 
-            padding: '16px' 
-          }}>
-            <div className="label">Total Events</div>
-            <div className="value mono" style={{ fontSize: '28px' }}>{events.length}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 md:p-4">
+            <div className="label text-xs md:text-sm">Total Events</div>
+            <div className="value mono text-xl md:text-2xl">{events.length}</div>
           </div>
-          <div style={{ 
-            background: '#fafafa', 
-            border: '1px solid var(--line)', 
-            borderRadius: '10px', 
-            padding: '16px' 
-          }}>
-            <div className="label">Total Participants</div>
-            <div className="value mono" style={{ fontSize: '28px' }}>{allRows.length}</div>
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 md:p-4">
+            <div className="label text-xs md:text-sm">Total Participants</div>
+            <div className="value mono text-xl md:text-2xl">{allRows.length}</div>
           </div>
-          <div style={{ 
-            background: '#fafafa', 
-            border: '1px solid var(--line)', 
-            borderRadius: '10px', 
-            padding: '16px' 
-          }}>
-            <div className="label">Categories</div>
-            <div className="value mono" style={{ fontSize: '28px' }}>{categories.length}</div>
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 md:p-4">
+            <div className="label text-xs md:text-sm">Categories</div>
+            <div className="value mono text-xl md:text-2xl">{categories.length}</div>
           </div>
-          <div style={{ 
-            background: '#fafafa', 
-            border: '1px solid var(--line)', 
-            borderRadius: '10px', 
-            padding: '16px' 
-          }}>
-            <div className="label">Active Banners</div>
-            <div className="value mono" style={{ fontSize: '28px' }}>{banners.filter(b => b.active || b.isActive).length}</div>
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 md:p-4">
+            <div className="label text-xs md:text-sm">Active Banners</div>
+            <div className="value mono text-xl md:text-2xl">{banners.filter(b => b.active || b.isActive).length}</div>
           </div>
         </div>
       </div>
 
       {/* Event Title Settings */}
       <div className="card">
-        <div className="header-row">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div>
             <h2 className="section-title">Event Settings</h2>
             <div className="subtle">Ubah judul event yang tampil di halaman leaderboard.</div>
           </div>
-          <button className="btn" onClick={saveEventTitle}>
+          <button className="btn w-full sm:w-auto" onClick={saveEventTitle}>
             Save Title
           </button>
         </div>

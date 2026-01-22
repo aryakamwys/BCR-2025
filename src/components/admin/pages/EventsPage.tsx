@@ -175,130 +175,118 @@ export default function EventsPage({ events, onEventsChange }: EventsPageProps) 
     <>
       {/* Manage Events */}
       <div className="card">
-        <div className="header-row">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div>
             <h2 className="section-title">Manage Events</h2>
             <div className="subtle">Create and manage multiple race events.</div>
           </div>
-          <button className="btn" onClick={() => setShowEventForm(!showEventForm)}>
+          <button className="btn w-full sm:w-auto" onClick={() => setShowEventForm(!showEventForm)}>
             {showEventForm ? "Cancel" : "+ Create Event"}
           </button>
         </div>
 
-        <div style={{
-          marginTop: '1rem',
-          padding: '0.75rem',
-          background: '#e7f3ff',
-          border: '1px solid #2196F3',
-          borderRadius: '4px',
-          color: '#0d47a1',
-          fontSize: '14px'
-        }}>
+        <div className="p-3 bg-blue-50 border border-blue-400 rounded text-blue-900 text-sm">
           <strong>Info:</strong> Setiap event memiliki kategori dan data CSV sendiri.
           Pilih event dari data table di bawah untuk mengelola event tersebut.
         </div>
 
         {showEventForm && (
-          <div style={{ marginTop: "1rem", padding: "1rem", background: "#f9fafb", borderRadius: "8px" }}>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>Event Name</label>
-              <input
-                className="search"
-                style={{ width: "100%" }}
-                placeholder="e.g., Jakarta Marathon 2025"
-                value={newEventName}
-                onChange={(e) => setNewEventName(e.target.value)}
-              />
-            </div>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>Event Date</label>
-              <input
-                type="date"
-                className="search"
-                style={{ width: "100%" }}
-                value={newEventDate}
-                onChange={(e) => setNewEventDate(e.target.value)}
-              />
-            </div>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>Location</label>
-              <input
-                className="search"
-                style={{ width: "100%" }}
-                placeholder="e.g., Jakarta, Indonesia"
-                value={newEventLocation}
-                onChange={(e) => setNewEventLocation(e.target.value)}
-              />
-            </div>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
-                Coordinates (Optional)
-              </label>
-              <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "0.5rem" }}>
-                For accurate map placement, enter coordinates from Google Maps. Right-click on a location → "What's here?" to get coordinates.
-              </div>
-              <div style={{ display: "flex", gap: "1rem" }}>
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block mb-2 font-medium text-sm">Event Name</label>
                 <input
-                  className="search"
-                  style={{ flex: 1 }}
-                  placeholder="Latitude (e.g., -6.9732083)"
-                  value={newEventLatitude}
-                  onChange={(e) => setNewEventLatitude(e.target.value)}
-                />
-                <input
-                  className="search"
-                  style={{ flex: 1 }}
-                  placeholder="Longitude (e.g., 107.6308535)"
-                  value={newEventLongitude}
-                  onChange={(e) => setNewEventLongitude(e.target.value)}
+                  className="search w-full"
+                  placeholder="e.g., Jakarta Marathon 2025"
+                  value={newEventName}
+                  onChange={(e) => setNewEventName(e.target.value)}
                 />
               </div>
-            </div>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>Description</label>
-              <textarea
-                className="search"
-                style={{ width: "100%", minHeight: "80px" }}
-                placeholder="Brief description of the event..."
-                value={newEventDescription}
-                onChange={(e) => setNewEventDescription(e.target.value)}
-              />
-            </div>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>Event Status</label>
-              <select
-                className="search"
-                style={{ width: "100%" }}
-                value={newEventStatus}
-                onChange={(e) => setNewEventStatus(e.target.value as EventStatus)}
-              >
-                <option value="upcoming">Upcoming</option>
-                <option value="ongoing">Ongoing</option>
-                <option value="completed">Completed</option>
-              </select>
-            </div>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <div>
+                <label className="block mb-2 font-medium text-sm">Event Date</label>
                 <input
-                  type="checkbox"
-                  checked={newEventActive}
-                  onChange={(e) => setNewEventActive(e.target.checked)}
+                  type="date"
+                  className="search w-full"
+                  value={newEventDate}
+                  onChange={(e) => setNewEventDate(e.target.value)}
                 />
-                <span>Event is active</span>
-              </label>
+              </div>
+              <div>
+                <label className="block mb-2 font-medium text-sm">Location</label>
+                <input
+                  className="search w-full"
+                  placeholder="e.g., Jakarta, Indonesia"
+                  value={newEventLocation}
+                  onChange={(e) => setNewEventLocation(e.target.value)}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block mb-2 font-medium text-sm">
+                  Coordinates (Optional)
+                </label>
+                <div className="text-xs text-gray-500 mb-2">
+                  For accurate map placement, enter coordinates from Google Maps.
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    className="search w-full"
+                    placeholder="Latitude"
+                    value={newEventLatitude}
+                    onChange={(e) => setNewEventLatitude(e.target.value)}
+                  />
+                  <input
+                    className="search w-full"
+                    placeholder="Longitude"
+                    value={newEventLongitude}
+                    onChange={(e) => setNewEventLongitude(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block mb-2 font-medium text-sm">Description</label>
+                <textarea
+                  className="search w-full min-h-[80px]"
+                  placeholder="Brief description of the event..."
+                  value={newEventDescription}
+                  onChange={(e) => setNewEventDescription(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block mb-2 font-medium text-sm">Event Status</label>
+                <select
+                  className="search w-full"
+                  value={newEventStatus}
+                  onChange={(e) => setNewEventStatus(e.target.value as EventStatus)}
+                >
+                  <option value="upcoming">Upcoming</option>
+                  <option value="ongoing">Ongoing</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+              <div className="flex items-end">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={newEventActive}
+                    onChange={(e) => setNewEventActive(e.target.checked)}
+                  />
+                  <span className="text-sm">Event is active</span>
+                </label>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              <button className="btn" onClick={handleCreateEvent}>
+            <div className="flex flex-col sm:flex-row gap-2 mt-4">
+              <button className="btn w-full sm:w-auto" onClick={handleCreateEvent}>
                 Create Event
               </button>
-              <button className="btn ghost" onClick={clearForm}>
+              <button className="btn ghost w-full sm:w-auto" onClick={clearForm}>
                 Clear
               </button>
             </div>
           </div>
         )}
 
-        <div className="table-wrap" style={{ marginTop: "1rem" }}>
+        {/* Desktop Table - hidden on mobile */}
+        <div className="hidden md:block table-wrap mt-4">
           <table className="f1-table compact">
             <thead>
               <tr>
@@ -363,6 +351,66 @@ export default function EventsPage({ events, onEventsChange }: EventsPageProps) 
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards - visible only on mobile */}
+        <div className="md:hidden mt-4 space-y-3">
+          {events.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">No events created yet</div>
+          ) : (
+            events.map((evt) => (
+              <div key={evt.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{evt.name}</h3>
+                    <p className="text-sm text-gray-500">{evt.location || "No location"}</p>
+                  </div>
+                  <span
+                    className="px-2 py-1 rounded-full text-xs font-bold"
+                    style={{
+                      background: getStatusColor(evt.status),
+                      color: getStatusTextColor(evt.status),
+                    }}
+                  >
+                    {evt.status || 'upcoming'}
+                  </span>
+                </div>
+                
+                <div className="text-sm text-gray-600 mb-3">
+                  <span className="mono">
+                    {evt.eventDate ? new Date(evt.eventDate).toLocaleDateString() : (evt.date || 'No date')}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <select
+                    className="search w-full text-sm"
+                    value={evt.status || 'upcoming'}
+                    onChange={(e) => handleStatusChange(evt.id, e.target.value as EventStatus)}
+                    disabled={updatingStatus === evt.id}
+                  >
+                    <option value="upcoming">Upcoming</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                  <div className="flex gap-2">
+                    <button
+                      className="btn flex-1"
+                      onClick={() => setSelectedEvent(evt)}
+                    >
+                      Manage
+                    </button>
+                    <button
+                      className="btn ghost flex-1"
+                      onClick={() => window.open(`/event/${evt.slug}`, '_blank')}
+                    >
+                      View
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </>

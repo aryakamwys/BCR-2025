@@ -469,27 +469,27 @@ function LeaderboardApp() {
         </div>
 
         {/* Events Sidebar - Desktop Only */}
-        <aside className="w-64 min-h-screen bg-gray-50 border-r border-gray-200 p-4 hidden lg:block">
-          <h3 className="font-bold text-gray-900 mb-4 text-lg">Events</h3>
+        <aside className="w-48 lg:w-64 min-h-screen bg-gray-50 border-r border-gray-200 p-3 lg:p-4 hidden lg:block">
+          <h3 className="font-bold text-gray-900 mb-3 lg:mb-4 text-sm lg:text-lg">Events</h3>
           <div className="space-y-2">
             {events.map((ev) => (
               <button
                 key={ev.id}
                 onClick={() => setCurrentEvent(ev)}
-                className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                className={`w-full text-left px-3 lg:px-4 py-2 lg:py-3 rounded-lg transition-all ${
                   currentEvent?.id === ev.id
                     ? 'bg-red-600 text-white shadow-md'
                     : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
                 }`}
               >
-                <div className="font-semibold text-sm truncate">{ev.name}</div>
-                <div className={`text-xs mt-1 ${currentEvent?.id === ev.id ? 'text-red-100' : 'text-gray-500'}`}>
+                <div className="font-semibold text-xs lg:text-sm truncate">{ev.name}</div>
+                <div className={`text-[10px] lg:text-xs mt-0.5 lg:mt-1 ${currentEvent?.id === ev.id ? 'text-red-100' : 'text-gray-500'}`}>
                   {ev.location || 'No location'}
                 </div>
               </button>
             ))}
             {events.length === 0 && (
-              <div className="text-gray-500 text-sm text-center py-4">
+              <div className="text-gray-500 text-xs lg:text-sm text-center py-4">
                 No events available
               </div>
             )}
@@ -497,10 +497,10 @@ function LeaderboardApp() {
         </aside>
 
         {/* Main Content */}
-        <div className="flex-1 page">
+        <div className="flex-1 px-2 sm:px-3 md:px-4 page">
           {/* Mobile: Current Event Selector - Compact inline style */}
-          <div className="lg:hidden mb-3">
-            <button 
+          <div className="lg:hidden mb-2 sm:mb-3">
+            <button
               onClick={() => setMobileEventSelectorOpen(true)}
               className="w-full bg-red-600 text-white rounded-lg px-3 py-2 flex items-center justify-between shadow-sm"
             >
@@ -508,7 +508,7 @@ function LeaderboardApp() {
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 flex-shrink-0">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                 </svg>
-                <span className="font-semibold text-sm truncate">{currentEvent?.name || 'Pilih Event'}</span>
+                <span className="font-semibold text-xs sm:text-sm truncate">{currentEvent?.name || 'Pilih Event'}</span>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
@@ -518,14 +518,14 @@ function LeaderboardApp() {
             </button>
           </div>
 
-          {/* Title - Hidden on mobile since event name is shown in selector */}
-          <h1 className="app-title hidden lg:block">{eventTitle}</h1>
+          {/* Title - Responsive */}
+          <h1 className="app-title text-base sm:text-lg md:text-xl lg:text-2xl hidden lg:block">{eventTitle}</h1>
 
-      <div className="tabs">
+      <div className="tabs flex-wrap gap-1 sm:gap-2">
         {tabs.map((t) => (
           <button
             key={t}
-            className={`tab ${activeTab === t ? "active" : ""}`}
+            className={`tab text-xs sm:text-sm flex-shrink-0 ${activeTab === t ? "active" : ""}`}
             onClick={() => setActiveTab(t)}
           >
             {t}

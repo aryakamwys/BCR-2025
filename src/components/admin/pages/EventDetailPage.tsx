@@ -340,44 +340,44 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
   return (
     <div className="event-detail-page">
       {/* Header */}
-      <div className="page-header">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4 pb-4 border-b border-gray-200">
         <button className="btn ghost" onClick={onBack}>
-          ← Back to Events
+          ← Back
         </button>
-        <div className="header-info">
-          <h1 className="page-title">{eventName}</h1>
-          <span className="event-slug">/{eventSlug}</span>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">{eventName}</h1>
+          <span className="text-gray-500 text-sm">/{eventSlug}</span>
         </div>
         <button 
-          className="btn" 
+          className="btn w-full sm:w-auto" 
           onClick={() => window.open(`/event/${eventSlug}`, '_blank')}
         >
           View Public Page
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="detail-tabs">
+      {/* Tabs - scrollable on mobile */}
+      <div className="flex gap-1 mb-4 overflow-x-auto pb-2 border-b-2 border-gray-200 -mx-3 px-3 md:mx-0 md:px-0">
         <button 
-          className={`detail-tab ${activeTab === 'data' ? 'active' : ''}`}
+          className={`detail-tab whitespace-nowrap ${activeTab === 'data' ? 'active' : ''}`}
           onClick={() => setActiveTab('data')}
         >
           Data Upload
         </button>
         <button 
-          className={`detail-tab ${activeTab === 'banners' ? 'active' : ''}`}
+          className={`detail-tab whitespace-nowrap ${activeTab === 'banners' ? 'active' : ''}`}
           onClick={() => setActiveTab('banners')}
         >
           Banners ({banners.length})
         </button>
         <button 
-          className={`detail-tab ${activeTab === 'categories' ? 'active' : ''}`}
+          className={`detail-tab whitespace-nowrap ${activeTab === 'categories' ? 'active' : ''}`}
           onClick={() => setActiveTab('categories')}
         >
           Categories ({categories.length})
         </button>
         <button 
-          className={`detail-tab ${activeTab === 'route' ? 'active' : ''}`}
+          className={`detail-tab whitespace-nowrap ${activeTab === 'route' ? 'active' : ''}`}
           onClick={() => setActiveTab('route')}
         >
           Route {currentGpxPath ? '(1)' : '(0)'}
@@ -387,19 +387,20 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
       {/* Data Upload Tab */}
       {activeTab === 'data' && (
         <div className="card">
-          <div className="header-row">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <div>
               <h2 className="section-title">CSV Upload</h2>
-              <div className="subtle">
-                Upload CSV data untuk event ini. Master & Finish wajib. Start optional jika menggunakan Category Start Times.
+              <div className="subtle text-sm">
+                Upload CSV data untuk event ini. Master & Finish wajib.
               </div>
             </div>
-            <button className="btn ghost" onClick={clearAllCsv}>
+            <button className="btn ghost w-full sm:w-auto" onClick={clearAllCsv}>
               Reset All CSV
             </button>
           </div>
 
-          <div className="table-wrap">
+          {/* Desktop Table - hidden on mobile */}
+          <div className="hidden md:block table-wrap">
             <table className="f1-table compact">
               <thead>
                 <tr>
@@ -445,34 +446,101 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Cards - visible only on mobile */}
+          <div className="md:hidden space-y-3">
+            {(["master", "start", "finish", "checkpoint"] as CsvKind[]).map((kind) => {
+              const meta = metaByKind[kind];
+              const isRequired = kind === "master" || kind === "finish";
+              return (
+                <div key={kind} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="mono font-bold">{kind.toUpperCase()}</span>
+                      {isRequired && (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">Required</span>
+                      )}
+                    </div>
+                    {meta ? (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">
+                        Uploaded
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
+                        Empty
+                      </span>
+                    )}
+                  </div>
+                  
+                  {meta && (
+                    <div className="text-sm text-gray-600 mb-2 space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">File:</span>
+                        <span className="mono truncate max-w-[150px]">{meta.filename}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Rows:</span>
+                        <span className="mono">{meta.rows}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <label className="flex-1">
+                      <input
+                        type="file"
+                        accept=".csv,text/csv"
+                        className="block w-full text-sm text-gray-500
+                          file:mr-2 file:py-2 file:px-3
+                          file:rounded-lg file:border-0
+                          file:text-xs file:font-medium
+                          file:bg-gray-100 file:text-gray-700
+                          hover:file:bg-gray-200
+                          cursor-pointer"
+                        onChange={(e) => {
+                          const f = (e.target as HTMLInputElement).files?.[0];
+                          if (f) uploadCsv(kind, f);
+                        }}
+                      />
+                    </label>
+                    {meta && (
+                      <button className="btn ghost text-sm" onClick={() => clearCsv(kind)}>
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
       {/* Banners Tab */}
       {activeTab === 'banners' && (
         <div className="card">
-          <div className="header-row">
+          <div className="header-row mb-4">
             <div>
               <h2 className="section-title">Banner Images</h2>
-              <div className="subtle">
+              <div className="subtle text-sm">
                 Upload banner images yang akan ditampilkan di halaman event.
               </div>
             </div>
           </div>
 
           {/* Banner Upload */}
-          <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f9fafb', borderRadius: '8px' }}>
-            <div className="subtle" style={{ marginBottom: '0.5rem', fontWeight: 500 }}>Upload New Banner</div>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+            <div className="subtle mb-2 font-medium text-sm">Upload New Banner</div>
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 id="banner-upload"
                 type="file"
                 accept="image/*"
                 onChange={(e) => setBannerFile(e.target.files?.[0] || null)}
-                style={{ flex: 1 }}
+                className="flex-1 text-sm"
               />
               <button
-                className="btn"
+                className="btn w-full sm:w-auto"
                 onClick={handleBannerUpload}
                 disabled={!bannerFile || uploadingBanner}
               >
@@ -481,8 +549,8 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
             </div>
           </div>
 
-          {/* Banner List */}
-          <div className="table-wrap">
+          {/* Desktop Table - hidden on mobile */}
+          <div className="hidden md:block table-wrap">
             <table className="f1-table compact">
               <thead>
                 <tr>
@@ -542,38 +610,79 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Cards - visible only on mobile */}
+          <div className="md:hidden space-y-3">
+            {banners.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">No banners uploaded yet</div>
+            ) : (
+              banners.map((banner) => (
+                <div key={banner.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+                  <img
+                    src={banner.imageUrl}
+                    alt={banner.alt || "Banner"}
+                    className="w-full h-32 object-cover"
+                  />
+                  <div className="p-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <span
+                        className="px-2 py-1 rounded-full text-xs font-bold"
+                        style={{
+                          background: banner.isActive ? '#dcfce7' : '#f3f4f6',
+                          color: banner.isActive ? '#166534' : '#6b7280',
+                        }}
+                      >
+                        {banner.isActive ? "Active" : "Hidden"}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="btn ghost flex-1 text-sm" onClick={() => toggleBannerActive(banner.id)}>
+                        {banner.isActive ? 'Hide' : 'Show'}
+                      </button>
+                      <button 
+                        className="btn ghost flex-1 text-sm" 
+                        style={{ color: '#dc2626' }}
+                        onClick={() => deleteBanner(banner.id, banner.imageUrl)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
 
       {/* Categories Tab */}
       {activeTab === 'categories' && (
         <div className="card">
-          <div className="header-row">
+          <div className="header-row mb-4">
             <div>
               <h2 className="section-title">Race Categories</h2>
-              <div className="subtle">
+              <div className="subtle text-sm">
                 Kelola kategori lomba untuk event ini.
               </div>
             </div>
           </div>
 
           {/* Add Category */}
-          <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem' }}>
+          <div className="flex flex-col sm:flex-row gap-2 mb-4">
             <input
-              className="search"
-              style={{ flex: 1 }}
+              className="search flex-1"
               placeholder="e.g., 10K Laki-laki"
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addCategory()}
             />
-            <button className="btn" onClick={addCategory} disabled={!newCategory.trim()}>
+            <button className="btn w-full sm:w-auto" onClick={addCategory} disabled={!newCategory.trim()}>
               + Add Category
             </button>
           </div>
 
-          {/* Category List */}
-          <div className="table-wrap">
+          {/* Desktop Table - hidden on mobile */}
+          <div className="hidden md:block table-wrap">
             <table className="f1-table compact">
               <thead>
                 <tr>
@@ -607,110 +716,104 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Cards - visible only on mobile */}
+          <div className="md:hidden space-y-2">
+            {categories.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">No categories yet</div>
+            ) : (
+              categories.map((cat, index) => (
+                <div key={cat} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex justify-between items-center">
+                  <div>
+                    <span className="font-medium text-gray-900">{cat}</span>
+                    <span className="text-xs text-gray-400 ml-2">#{index + 1}</span>
+                  </div>
+                  <button 
+                    className="btn ghost text-sm" 
+                    style={{ color: '#dc2626' }}
+                    onClick={() => removeCategory(cat)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
 
       {/* Route Tab */}
       {activeTab === 'route' && (
         <div className="card">
-          <div className="header-row">
+          <div className="header-row mb-4">
             <div>
               <h2 className="section-title">GPX Route File</h2>
-              <div className="subtle">
+              <div className="subtle text-sm">
                 Upload file GPX untuk menampilkan rute lomba di peta.
               </div>
             </div>
           </div>
 
           {/* GPX Upload */}
-          <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f9fafb', borderRadius: '8px' }}>
-            <div className="subtle" style={{ marginBottom: '0.5rem', fontWeight: 500 }}>Upload GPX File</div>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+            <div className="subtle mb-2 font-medium text-sm">Upload GPX File</div>
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 id="gpx-upload"
                 type="file"
                 accept=".gpx,application/gpx+xml"
                 onChange={(e) => setGpxFile(e.target.files?.[0] || null)}
-                style={{ flex: 1 }}
+                className="flex-1 text-sm"
               />
               <button
-                className="btn"
+                className="btn w-full sm:w-auto"
                 onClick={handleGpxUpload}
                 disabled={!gpxFile || uploadingGpx}
               >
                 {uploadingGpx ? 'Uploading...' : 'Upload'}
               </button>
             </div>
-            <div style={{ marginTop: '0.5rem', fontSize: '12px', color: '#6b7280' }}>
+            <div className="mt-2 text-xs text-gray-500">
               Format yang didukung: .gpx (GPS Exchange Format)
             </div>
           </div>
 
           {/* Current GPX */}
-          <div className="table-wrap">
-            <table className="f1-table compact">
-              <thead>
-                <tr>
-                  <th>Status</th>
-                  <th>File Path</th>
-                  <th style={{ width: 150 }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentGpxPath ? (
-                  <tr className="row-hover">
-                    <td>
-                      <span style={{
-                        padding: '4px 8px',
-                        borderRadius: '999px',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        background: '#dcfce7',
-                        color: '#166534',
-                      }}>
-                        Uploaded
-                      </span>
-                    </td>
-                    <td className="mono" style={{ fontSize: '12px' }}>{currentGpxPath}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                          className="btn ghost"
-                          onClick={() => window.open(currentGpxPath, '_blank')}
-                        >
-                          View
-                        </button>
-                        <button 
-                          className="btn ghost" 
-                          style={{ color: '#dc2626' }}
-                          onClick={clearGpxFile}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr>
-                    <td colSpan={3} className="empty">No GPX file uploaded yet</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          {currentGpxPath ? (
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-bold">
+                    Uploaded
+                  </span>
+                  <p className="mono text-xs text-gray-600 mt-2 break-all">{currentGpxPath}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    className="btn ghost flex-1 sm:flex-none"
+                    onClick={() => window.open(currentGpxPath, '_blank')}
+                  >
+                    View
+                  </button>
+                  <button 
+                    className="btn ghost flex-1 sm:flex-none" 
+                    style={{ color: '#dc2626' }}
+                    onClick={clearGpxFile}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-gray-500 py-8 border border-dashed border-gray-300 rounded-lg">
+              No GPX file uploaded yet
+            </div>
+          )}
 
           {/* Info box */}
-          <div style={{
-            marginTop: '1rem',
-            padding: '0.75rem',
-            background: '#e7f3ff',
-            border: '1px solid #2196F3',
-            borderRadius: '4px',
-            color: '#0d47a1',
-            fontSize: '14px'
-          }}>
-            <strong>Info:</strong> File GPX akan ditampilkan sebagai rute di halaman event publik. 
-            Anda bisa membuat file GPX menggunakan aplikasi seperti Strava, Garmin Connect, atau GPX Editor.
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-400 rounded text-blue-900 text-sm">
+            <strong>Info:</strong> File GPX akan ditampilkan sebagai rute di halaman event publik.
           </div>
         </div>
       )}
@@ -720,43 +823,11 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
           padding: 0;
         }
 
-        .page-header {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          margin-bottom: 1.5rem;
-          padding-bottom: 1rem;
-          border-bottom: 1px solid #e5e7eb;
-        }
-
-        .header-info {
-          flex: 1;
-        }
-
-        .page-title {
-          font-size: 1.5rem;
-          font-weight: 700;
-          color: #111827;
-          margin: 0;
-        }
-
-        .event-slug {
-          color: #6b7280;
-          font-size: 0.875rem;
-        }
-
-        .detail-tabs {
-          display: flex;
-          gap: 0.5rem;
-          margin-bottom: 1.5rem;
-          border-bottom: 2px solid #e5e7eb;
-        }
-
         .detail-tab {
-          padding: 0.75rem 1.25rem;
+          padding: 0.5rem 1rem;
           background: none;
           border: none;
-          font-size: 0.9rem;
+          font-size: 0.875rem;
           font-weight: 500;
           color: #6b7280;
           cursor: pointer;

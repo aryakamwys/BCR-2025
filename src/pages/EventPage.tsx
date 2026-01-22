@@ -765,6 +765,7 @@ export default function EventPage() {
           .event-tabs-container {
             background: white;
             border-bottom: 1px solid #e5e7eb;
+            position: relative;
           }
 
           .event-tabs {
@@ -774,6 +775,36 @@ export default function EventPage() {
             display: flex;
             gap: 0;
             overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+          }
+
+          .event-tabs::-webkit-scrollbar {
+            display: none;
+          }
+
+          /* Scroll fade indicators */
+          .event-tabs-container::before,
+          .event-tabs-container::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 30px;
+            pointer-events: none;
+            z-index: 2;
+            opacity: 0;
+            transition: opacity 0.3s;
+          }
+
+          .event-tabs-container::before {
+            left: 0;
+            background: linear-gradient(to right, white 30%, transparent);
+          }
+
+          .event-tabs-container::after {
+            right: 0;
+            background: linear-gradient(to left, white 30%, transparent);
           }
 
           .event-tab {
@@ -787,6 +818,7 @@ export default function EventPage() {
             transition: all 0.2s;
             border-bottom: 2px solid transparent;
             white-space: nowrap;
+            flex-shrink: 0;
           }
 
           .event-tab:hover {
@@ -917,16 +949,30 @@ export default function EventPage() {
               font-size: 1.25rem;
             }
 
+            .event-tabs-container {
+              position: relative;
+            }
+
+            .event-tabs-container::after {
+              opacity: 1;
+            }
+
             .event-tabs {
-              padding: 0 1rem;
+              padding: 0 0.75rem;
+              gap: 0.25rem;
             }
 
             .event-tab {
-              padding: 0.75rem 1rem;
+              padding: 0.875rem 1rem;
               font-size: 0.8rem;
+              min-width: fit-content;
             }
 
             .event-content {
+              padding: 1rem;
+            }
+
+            .content-section {
               padding: 1rem;
             }
 
@@ -946,7 +992,34 @@ export default function EventPage() {
             }
 
             .route-map-container iframe {
-              height: 350px;
+              height: 300px;
+            }
+          }
+
+          @media (max-width: 480px) {
+            .event-tabs {
+              padding: 0 0.5rem;
+            }
+
+            .event-tab {
+              padding: 0.75rem 0.75rem;
+              font-size: 0.75rem;
+            }
+
+            .event-title {
+              font-size: 1.1rem;
+            }
+
+            .simple-stats {
+              gap: 1rem;
+            }
+
+            .stat-number {
+              font-size: 1.5rem;
+            }
+
+            .route-map-container iframe {
+              height: 250px;
             }
           }
         `}</style>

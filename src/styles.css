@@ -52,6 +52,18 @@ body {
   flex-wrap: wrap;
 }
 
+@media (max-width: 640px) {
+  .header-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .header-row > div:first-child {
+    text-align: center;
+  }
+}
+
 .section-title {
   font-size: 17px;
   font-weight: 800;
@@ -69,6 +81,24 @@ body {
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .tools {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .tools .search {
+    width: 100%;
+    min-width: unset;
+  }
+  
+  .tools .btn {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+  }
 }
 
 .search {
@@ -140,8 +170,14 @@ body {
 .f1-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 860px;
+  min-width: 700px;
   background: #fff;
+}
+
+@media (min-width: 768px) {
+  .f1-table {
+    min-width: 860px;
+  }
 }
 
 .f1-table.compact {
@@ -303,7 +339,13 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  padding: 16px;
+  padding: 12px;
+}
+
+@media (min-width: 640px) {
+  .modal-backdrop {
+    padding: 16px;
+  }
 }
 
 .modal-card {
@@ -331,6 +373,16 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+@media (max-width: 480px) {
+  .modal-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-wide {
+    grid-column: span 1;
+  }
 }
 .modal-item {
   background: #fafafa;
@@ -956,4 +1008,19 @@ body {
 
 .admin-sidebar::-webkit-scrollbar-thumb:hover {
   background: #64748b;
+}
+
+/* ============================================
+   MOBILE CAROUSEL SCROLLBAR HIDING
+   ============================================ */
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }

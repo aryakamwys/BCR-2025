@@ -93,6 +93,9 @@ function LeaderboardApp() {
   const [modalOpen, setModalOpen] = useState(false);
 
   const [recalcTick, setRecalcTick] = useState(0);
+  
+  // Mobile event selector state
+  const [mobileEventSelectorOpen, setMobileEventSelectorOpen] = useState(false);
 
   const eventId = currentEvent?.id || 'default';
   
@@ -407,7 +410,65 @@ function LeaderboardApp() {
       <Navbar showAdminButton={true} />
 
       <div className="flex">
-        {/* Events Sidebar */}
+        {/* Mobile Event Selector - Only visible on mobile */}
+        <div className="lg:hidden w-full fixed bottom-0 left-0 right-0 z-40">
+          {/* Backdrop */}
+          {mobileEventSelectorOpen && (
+            <div 
+              className="fixed inset-0 bg-black/50 z-40"
+              onClick={() => setMobileEventSelectorOpen(false)}
+            />
+          )}
+          
+          {/* Event List Drawer */}
+          <div className={`fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl z-50 transition-transform duration-300 ease-out ${
+            mobileEventSelectorOpen ? 'translate-y-0' : 'translate-y-full'
+          }`}>
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-gray-900 text-lg">Pilih Event</h3>
+                <button 
+                  onClick={() => setMobileEventSelectorOpen(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="p-4 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-2">
+                {events.map((ev) => (
+                  <button
+                    key={ev.id}
+                    onClick={() => {
+                      setCurrentEvent(ev);
+                      setMobileEventSelectorOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-3 rounded-xl transition-all ${
+                      currentEvent?.id === ev.id
+                        ? 'bg-red-600 text-white shadow-md'
+                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
+                    }`}
+                  >
+                    <div className="font-semibold truncate">{ev.name}</div>
+                    <div className={`text-sm mt-1 ${currentEvent?.id === ev.id ? 'text-red-100' : 'text-gray-500'}`}>
+                      {ev.location || 'No location'}
+                    </div>
+                  </button>
+                ))}
+                {events.length === 0 && (
+                  <div className="text-gray-500 text-sm text-center py-4">
+                    No events available
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Events Sidebar - Desktop Only */}
         <aside className="w-64 min-h-screen bg-gray-50 border-r border-gray-200 p-4 hidden lg:block">
           <h3 className="font-bold text-gray-900 mb-4 text-lg">Events</h3>
           <div className="space-y-2">
@@ -437,6 +498,32 @@ function LeaderboardApp() {
 
         {/* Main Content */}
         <div className="flex-1 page">
+          {/* Mobile: Current Event Info */}
+          <div className="lg:hidden mb-4">
+            <button 
+              onClick={() => setMobileEventSelectorOpen(true)}
+              className="w-full bg-white border border-gray-200 rounded-xl p-3 flex items-center justify-between shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="white" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <div className="text-xs text-gray-500">Event saat ini</div>
+                  <div className="font-semibold text-gray-900 truncate max-w-[200px]">{currentEvent?.name || 'Pilih Event'}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-red-600">
+                <span className="text-xs font-medium">Ganti</span>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+              </div>
+            </button>
+          </div>
+
           <h1 className="app-title">{eventTitle}</h1>
 
       <div className="tabs">

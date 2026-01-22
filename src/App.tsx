@@ -498,33 +498,28 @@ function LeaderboardApp() {
 
         {/* Main Content */}
         <div className="flex-1 page">
-          {/* Mobile: Current Event Info */}
-          <div className="lg:hidden mb-4">
+          {/* Mobile: Current Event Selector - Compact inline style */}
+          <div className="lg:hidden mb-3">
             <button 
               onClick={() => setMobileEventSelectorOpen(true)}
-              className="w-full bg-white border border-gray-200 rounded-xl p-3 flex items-center justify-between shadow-sm"
+              className="w-full bg-red-600 text-white rounded-lg px-3 py-2 flex items-center justify-between shadow-sm"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="white" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-                  </svg>
-                </div>
-                <div className="text-left">
-                  <div className="text-xs text-gray-500">Event saat ini</div>
-                  <div className="font-semibold text-gray-900 truncate max-w-[200px]">{currentEvent?.name || 'Pilih Event'}</div>
-                </div>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 flex-shrink-0">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                </svg>
+                <span className="font-semibold text-sm truncate">{currentEvent?.name || 'Pilih Event'}</span>
               </div>
-              <div className="flex items-center gap-1 text-red-600">
-                <span className="text-xs font-medium">Ganti</span>
+              <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
                 </svg>
               </div>
             </button>
           </div>
 
-          <h1 className="app-title">{eventTitle}</h1>
+          {/* Title - Hidden on mobile since event name is shown in selector */}
+          <h1 className="app-title hidden lg:block">{eventTitle}</h1>
 
       <div className="tabs">
         {tabs.map((t) => (

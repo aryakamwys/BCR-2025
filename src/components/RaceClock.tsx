@@ -2,29 +2,18 @@ import React, { useEffect, useMemo, useState } from "react";
 import { CATEGORY_KEYS } from "../lib/config";
 import parseTimeToMs from "../lib/time";
 
-const LS_CUTOFF = "imr_cutoff_ms";
-const LS_CAT_START = "imr_cat_start_raw";
 const LS_EVENT_DATE = "imr_event_date"; // optional: "2025-11-23"
+
+interface RaceClockProps {
+  cutoffMs?: number | null;
+  categoryStartTimes?: Record<string, string> | null;
+}
 
 function normalizeCutoffMs(n: number | null): number | null {
   if (n == null || !Number.isFinite(n) || n <= 0) return null;
   // kalau kecil (<=48) kita anggap jam
   if (n <= 48) return n * 3600000;
   return n;
-}
-
-function readCutoffMs(): number | null {
-  const v = localStorage.getItem(LS_CUTOFF);
-  if (!v) return null;
-  return normalizeCutoffMs(Number(v));
-}
-
-function readCatStartRaw(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(LS_CAT_START) || "{}");
-  } catch {
-    return {};
-  }
 }
 
 function readEventDate(): string | null {
@@ -103,14 +92,18 @@ function toAbsStartMs(raw: string, baseDateYMD: string): number | null {
   return d.getTime();
 }
 
-export default function RaceClock() {
+export default function RaceClock({ cutoffMs: propCutoffMs, categoryStartTimes: propCategoryStartTimes }: RaceClockProps = {}) {
   const [nowMs, setNowMs] = useState(Date.now());
   const [slot, setSlot] = useState(0);
 
-  const [cutoffMs, setCutoffMs] = useState<number | null>(readCutoffMs());
-  const [catStartRaw, setCatStartRaw] = useState<Record<string, string>>(
-    readCatStartRaw()
-  );
+  // Use props if provided, otherwise component won't show anything (no localStorage fallback)
+  const cutoffMs = useMemo(() => {
+    return normalizeCutoffMs(propCutoffMs ?? null);
+  }, [propCutoffMs]);
+
+  const catStartRaw = useMemo(() => {
+    return propCategoryStartTimes ?? {};
+  }, [propCategoryStartTimes]);
 
   // tick clock
   useEffect(() => {
@@ -121,15 +114,6 @@ export default function RaceClock() {
   // rotate categories each 20s
   useEffect(() => {
     const id = setInterval(() => setSlot((s) => s + 1), 20000);
-    return () => clearInterval(id);
-  }, []);
-
-  // polling config every 2s (biar update setelah save admin)
-  useEffect(() => {
-    const id = setInterval(() => {
-      setCutoffMs(readCutoffMs());
-      setCatStartRaw(readCatStartRaw());
-    }, 2000);
     return () => clearInterval(id);
   }, []);
 

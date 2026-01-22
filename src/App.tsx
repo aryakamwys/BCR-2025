@@ -16,10 +16,7 @@ import AdminLayout from "./components/admin/AdminLayout";
 import {
   OverviewPageWrapper,
   EventsPageWrapper,
-  DataPageWrapper,
   BannersPageWrapper,
-  CategoriesPageWrapper,
-  TimingPageWrapper,
   DQPageWrapper
 } from "./components/admin/wrappers";
 import { EventProvider, useEvent } from "./contexts/EventContext";
@@ -31,33 +28,11 @@ import {
 import { DEFAULT_EVENT_TITLE, LS_EVENT_TITLE, LS_DATA_VERSION } from "./lib/config";
 import parseTimeToMs, { extractTimeOfDay, formatDuration } from "./lib/time";
 
-const LS_CUTOFF = "imr_cutoff_ms";
 const LS_DQ = "imr_dq_map";
-const LS_CAT_START = "imr_cat_start_raw";
-
-function loadCutoffMs(): number | null {
-  const v = localStorage.getItem(LS_CUTOFF);
-  if (!v) return null;
-  const n = Number(v);
-  if (!Number.isFinite(n) || n <= 0) return null;
-
-  // kalau kecil (<=48) dianggap jam → konversi ke ms
-  if (n <= 48) return n * 3600000;
-
-  // kalau sudah besar, anggap sudah ms
-  return n;
-}
 
 function loadDQMap(): Record<string, boolean> {
   try {
     return JSON.parse(localStorage.getItem(LS_DQ) || "{}");
-  } catch {
-    return {};
-  }
-}
-function loadCatStartRaw(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(LS_CAT_START) || "{}");
   } catch {
     return {};
   }
@@ -145,9 +120,10 @@ function LeaderboardApp() {
         const cpMap = await loadCheckpointTimesMap(eventId);
         setCheckpointMap(cpMap);
 
-        const cutoffMs = loadCutoffMs();
+        // Use timing from event (per-event database) instead of localStorage
+        const cutoffMs = currentEvent?.cutoffMs ?? null;
         const dqMap = loadDQMap();
-        const catStartRaw = loadCatStartRaw();
+        const catStartRaw: Record<string, string> = (currentEvent?.categoryStartTimes as Record<string, string>) ?? {};
 
         const absOverrideMs: Record<string, number | null> = {};
         const timeOnlyStr: Record<string, string | null> = {};
@@ -555,7 +531,7 @@ function LeaderboardApp() {
         <>
           {state.status === "ready" || hasLoadedOnce ? (
             <>
-              <RaceClock />
+              <RaceClock cutoffMs={currentEvent?.cutoffMs} categoryStartTimes={currentEvent?.categoryStartTimes} />
               <LeaderboardTable
                 title="Overall Result (All Categories)"
                 rows={overall}
@@ -575,7 +551,7 @@ function LeaderboardApp() {
         <>
           {state.status === "ready" || hasLoadedOnce ? (
             <>
-              <RaceClock />
+              <RaceClock cutoffMs={currentEvent?.cutoffMs} categoryStartTimes={currentEvent?.categoryStartTimes} />
               <CategorySection
                 categoryKey={activeTab}
                 rows={(byCategory as any)[activeTab] || []}
@@ -616,10 +592,7 @@ export default function App() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route path="overview" element={<OverviewPageWrapper />} />
           <Route path="events" element={<EventsPageWrapper />} />
-          <Route path="data" element={<DataPageWrapper />} />
           <Route path="banners" element={<BannersPageWrapper />} />
-          <Route path="categories" element={<CategoriesPageWrapper />} />
-          <Route path="timing" element={<TimingPageWrapper />} />
           <Route path="dq" element={<DQPageWrapper />} />
         </Route>
       </Routes>

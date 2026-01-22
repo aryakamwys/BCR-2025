@@ -13,6 +13,8 @@ interface Event {
   categories?: string[];
   gpxFile?: string;
   status?: string;
+  cutoffMs?: number | null;
+  categoryStartTimes?: Record<string, string> | null;
 }
 
 interface EventContextType {

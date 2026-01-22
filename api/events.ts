@@ -28,6 +28,8 @@ export interface Event {
   isActive: boolean;
   createdAt: number;
   categories: string[];
+  cutoffMs?: number | null;
+  categoryStartTimes?: Record<string, string> | null;
 }
 
 function formatEvent(event: any): Event {
@@ -45,6 +47,8 @@ function formatEvent(event: any): Event {
     isActive: event.isActive,
     categories: event.categories.map((c: any) => c.name),
     createdAt: event.createdAt.getTime(),
+    cutoffMs: event.cutoffMs ?? null,
+    categoryStartTimes: event.categoryStartTimes ?? null,
   };
 }
 

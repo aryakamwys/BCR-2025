@@ -6,30 +6,11 @@ import parseTimeToMs, { extractTimeOfDay, formatDuration } from '../../../lib/ti
 import OverviewPage from '../pages/OverviewPage';
 import type { LeaderRow } from '../../LeaderboardTable';
 
-const LS_CUTOFF = "imr_cutoff_ms";
 const LS_DQ = "imr_dq_map";
-const LS_CAT_START = "imr_cat_start_raw";
-
-function loadCutoffMs(): number | null {
-  const v = localStorage.getItem(LS_CUTOFF);
-  if (!v) return null;
-  const n = Number(v);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  if (n <= 48) return n * 3600000;
-  return n;
-}
 
 function loadDQMap(): Record<string, boolean> {
   try {
     return JSON.parse(localStorage.getItem(LS_DQ) || "{}");
-  } catch {
-    return {};
-  }
-}
-
-function loadCatStartRaw(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(LS_CAT_START) || "{}");
   } catch {
     return {};
   }
@@ -57,9 +38,10 @@ export default function OverviewPageWrapper() {
         const startMap = await loadTimesMap("start", eventId);
         const finishMap = await loadTimesMap("finish", eventId);
 
-        const cutoffMs = loadCutoffMs();
+        // Use timing from event (per-event database) instead of localStorage
+        const cutoffMs = currentEvent?.cutoffMs ?? null;
         const dqMap = loadDQMap();
-        const catStartRaw = loadCatStartRaw();
+        const catStartRaw: Record<string, string> = (currentEvent?.categoryStartTimes as Record<string, string>) ?? {};
 
         const absOverrideMs: Record<string, number | null> = {};
         const timeOnlyStr: Record<string, string | null> = {};

@@ -43,6 +43,7 @@ export default function TimingPageWrapper() {
   return (
     <TimingPage
       categories={categories}
+      eventId={currentEvent?.id || null}
       onConfigChanged={handleConfigChanged}
       onDataVersionBump={handleDataVersionBump}
     />

@@ -163,6 +163,7 @@ export default function AdminPageContent({ activeSection, allRows, onConfigChang
       return (
         <TimingPage
           categories={categories}
+          eventId={eventId || null}
           onConfigChanged={onConfigChanged}
           onDataVersionBump={bumpDataVersion}
         />

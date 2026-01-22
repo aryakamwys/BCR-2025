@@ -1,36 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 interface TimingPageProps {
   categories: string[];
+  eventId: string | null;
   onConfigChanged: () => void;
   onDataVersionBump: () => void;
-}
-
-const LS_CUTOFF = "imr_cutoff_ms";
-const LS_CAT_START = "imr_cat_start_raw";
-
-function loadCutoffMs(): number | null {
-  const v = localStorage.getItem(LS_CUTOFF);
-  if (!v) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-function saveCutoffMs(ms: number | null) {
-  if (ms == null) localStorage.removeItem(LS_CUTOFF);
-  else localStorage.setItem(LS_CUTOFF, String(ms));
-}
-
-function loadCatStartMap(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(LS_CAT_START) || "{}");
-  } catch {
-    return {};
-  }
-}
-
-function saveCatStartMap(map: Record<string, string>) {
-  localStorage.setItem(LS_CAT_START, JSON.stringify(map));
 }
 
 function formatNowAsTimestamp(): string {
@@ -48,18 +22,53 @@ function formatNowAsTimestamp(): string {
 
 export default function TimingPage({
   categories,
+  eventId,
   onConfigChanged,
   onDataVersionBump
 }: TimingPageProps) {
-  const [cutoffHours, setCutoffHours] = useState(() => {
-    const ms = loadCutoffMs();
-    if (!ms) return "";
-    return String(ms / 3600000);
-  });
+  const [cutoffHours, setCutoffHours] = useState("");
+  const [catStart, setCatStart] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const [catStart, setCatStart] = useState<Record<string, string>>(loadCatStartMap());
+  // Load timing data from API when eventId changes
+  const loadTimingData = useCallback(async () => {
+    if (!eventId) {
+      setCutoffHours("");
+      setCatStart({});
+      return;
+    }
 
-  // Update catStart when categories change
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/timing?eventId=${eventId}`);
+      if (res.ok) {
+        const data = await res.json();
+        // Convert cutoffMs to hours for display
+        if (data.cutoffMs != null) {
+          setCutoffHours(String(data.cutoffMs / 3600000));
+        } else {
+          setCutoffHours("");
+        }
+        // Load category start times
+        if (data.categoryStartTimes) {
+          setCatStart(data.categoryStartTimes);
+        } else {
+          setCatStart({});
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load timing data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [eventId]);
+
+  useEffect(() => {
+    loadTimingData();
+  }, [loadTimingData]);
+
+  // Update catStart when categories change (ensure all categories have entries)
   useEffect(() => {
     setCatStart(prev => {
       const newMap: Record<string, string> = {};
@@ -71,28 +80,94 @@ export default function TimingPage({
   }, [categories]);
 
   const applyCutoff = async () => {
-    const h = Number(cutoffHours);
-    let ms: number | null = null;
-    if (!Number.isFinite(h) || h <= 0) {
-      saveCutoffMs(null);
-    } else {
-      ms = h * 3600000;
-      saveCutoffMs(ms);
+    if (!eventId) {
+      alert("Please select an event first");
+      return;
     }
 
-    onDataVersionBump();
-    onConfigChanged();
-    alert("Cut off time berhasil diperbarui");
+    setSaving(true);
+    try {
+      const h = Number(cutoffHours);
+      let cutoffMs: number | null = null;
+      if (Number.isFinite(h) && h > 0) {
+        cutoffMs = h * 3600000;
+      }
+
+      const res = await fetch(`/api/timing?eventId=${eventId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cutoffMs, categoryStartTimes: catStart }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to save");
+      }
+
+      onDataVersionBump();
+      onConfigChanged();
+      alert("Cut off time berhasil diperbarui");
+    } catch (error: any) {
+      alert(`Error: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const applyCatStart = async () => {
-    saveCatStartMap(catStart);
-    onDataVersionBump();
-    onConfigChanged();
-    alert(
-      "Waktu start kategori berhasil diperbarui.\nTotal time akan menggunakan nilai ini per kategori."
-    );
+    if (!eventId) {
+      alert("Please select an event first");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const h = Number(cutoffHours);
+      let cutoffMs: number | null = null;
+      if (Number.isFinite(h) && h > 0) {
+        cutoffMs = h * 3600000;
+      }
+
+      const res = await fetch(`/api/timing?eventId=${eventId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cutoffMs, categoryStartTimes: catStart }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to save");
+      }
+
+      onDataVersionBump();
+      onConfigChanged();
+      alert(
+        "Waktu start kategori berhasil diperbarui.\nTotal time akan menggunakan nilai ini per kategori."
+      );
+    } catch (error: any) {
+      alert(`Error: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (!eventId) {
+    return (
+      <div className="card">
+        <div className="text-center py-8 text-gray-500">
+          Please select an event from the dropdown above to configure timing rules.
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="card">
+        <div className="text-center py-8">Loading timing configuration...</div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -105,8 +180,8 @@ export default function TimingPage({
               Cut off time dihitung dari start masing-masing pelari / kategori.
             </div>
           </div>
-          <button className="btn w-full sm:w-auto" onClick={applyCutoff}>
-            Save Cut Off
+          <button className="btn w-full sm:w-auto" onClick={applyCutoff} disabled={saving}>
+            {saving ? "Saving..." : "Save Cut Off"}
           </button>
         </div>
 
@@ -134,8 +209,8 @@ export default function TimingPage({
               <b>total time = finish time - start time kategori</b>.
             </div>
           </div>
-          <button className="btn w-full sm:w-auto" onClick={applyCatStart}>
-            Save Start Times
+          <button className="btn w-full sm:w-auto" onClick={applyCatStart} disabled={saving}>
+            {saving ? "Saving..." : "Save Start Times"}
           </button>
         </div>
 

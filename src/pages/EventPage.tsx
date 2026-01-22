@@ -15,9 +15,7 @@ import {
 import { LS_DATA_VERSION } from "../lib/config";
 import parseTimeToMs, { extractTimeOfDay, formatDuration } from "../lib/time";
 
-const LS_CUTOFF = "imr_cutoff_ms";
 const LS_DQ = "imr_dq_map";
-const LS_CAT_START = "imr_cat_start_raw";
 
 interface EventData {
   id: string;
@@ -31,6 +29,8 @@ interface EventData {
   gpxFile?: string;
   categories: string[];
   isActive: boolean;
+  cutoffMs?: number | null;
+  categoryStartTimes?: Record<string, string> | null;
 }
 
 interface Banner {
@@ -41,26 +41,9 @@ interface Banner {
   isActive: boolean;
 }
 
-function loadCutoffMs(): number | null {
-  const v = localStorage.getItem(LS_CUTOFF);
-  if (!v) return null;
-  const n = Number(v);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  if (n <= 48) return n * 3600000;
-  return n;
-}
-
 function loadDQMap(): Record<string, boolean> {
   try {
     return JSON.parse(localStorage.getItem(LS_DQ) || "{}");
-  } catch {
-    return {};
-  }
-}
-
-function loadCatStartRaw(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(LS_CAT_START) || "{}");
   } catch {
     return {};
   }
@@ -207,9 +190,10 @@ export default function EventPage() {
         const cpMap = await loadCheckpointTimesMap(event.id);
         setCheckpointMap(cpMap);
 
-        const cutoffMs = loadCutoffMs();
+        // Use timing from event (per-event database) instead of localStorage
+        const cutoffMs = event.cutoffMs ?? null;
         const dqMap = loadDQMap();
-        const catStartRaw = loadCatStartRaw();
+        const catStartRaw = event.categoryStartTimes ?? {};
 
         const absOverrideMs: Record<string, number | null> = {};
         const timeOnlyStr: Record<string, string | null> = {};
@@ -571,7 +555,7 @@ export default function EventPage() {
 
           {activeTab === "Results" && (
             <div className="content-section">
-              <RaceClock />
+              <RaceClock cutoffMs={event?.cutoffMs} categoryStartTimes={event?.categoryStartTimes} />
               <LeaderboardTable
                 title="Overall Result (All Categories)"
                 rows={overall}
@@ -582,7 +566,7 @@ export default function EventPage() {
 
           {activeTab !== "Participants" && activeTab !== "Results" && activeTab !== "Route" && (
             <div className="content-section">
-              <RaceClock />
+              <RaceClock cutoffMs={event?.cutoffMs} categoryStartTimes={event?.categoryStartTimes} />
               <CategorySection
                 categoryKey={activeTab}
                 rows={(byCategory as any)[activeTab] || []}

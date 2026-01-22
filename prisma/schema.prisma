@@ -7,21 +7,23 @@ datasource db {
 }
 
 model Event {
-  id          String     @id @default(uuid())
-  name        String
-  slug        String     @unique
-  description String?
-  eventDate   DateTime
-  location    String?
-  latitude    Float?
-  longitude   Float?
-  gpxFile     String?    // Path to GPX route file
-  status      String     @default("upcoming") // upcoming, ongoing, completed
-  isActive    Boolean    @default(true)
-  categories  Category[]
-  banners     Banner[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id                 String     @id @default(uuid())
+  name               String
+  slug               String     @unique
+  description        String?
+  eventDate          DateTime
+  location           String?
+  latitude           Float?
+  longitude          Float?
+  gpxFile            String?    // Path to GPX route file
+  status             String     @default("upcoming") // upcoming, ongoing, completed
+  isActive           Boolean    @default(true)
+  cutoffMs           Int?       // Cut off time in milliseconds (null = disabled)
+  categoryStartTimes Json?      // JSON object: { "10K Laki-laki": "2025-11-23 07:00:00.000", ... }
+  categories         Category[]
+  banners            Banner[]
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 }
 
 model Category {

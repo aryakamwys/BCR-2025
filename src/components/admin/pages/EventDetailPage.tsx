@@ -21,8 +21,22 @@ interface Banner {
   isActive: boolean;
 }
 
+// Helper function for timestamp formatting
+function formatNowAsTimestamp(): string {
+  const d = new Date();
+  const pad = (n: number, len = 2) => String(n).padStart(len, "0");
+  const Y = d.getFullYear();
+  const M = pad(d.getMonth() + 1);
+  const D = pad(d.getDate());
+  const h = pad(d.getHours());
+  const m = pad(d.getMinutes());
+  const s = pad(d.getSeconds());
+  const ms = pad(d.getMilliseconds(), 3);
+  return `${Y}-${M}-${D} ${h}:${m}:${s}.${ms}`;
+}
+
 export default function EventDetailPage({ eventId, eventSlug, eventName, onBack }: EventDetailPageProps) {
-  const [activeTab, setActiveTab] = useState<'data' | 'banners' | 'categories' | 'route' | 'settings'>('data');
+  const [activeTab, setActiveTab] = useState<'data' | 'banners' | 'categories' | 'route' | 'timing'>('data');
   const [csvMeta, setCsvMeta] = useState<Array<{ key: CsvKind; filename: string; updatedAt: number; rows: number }>>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -39,6 +53,11 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
   const [gpxFile, setGpxFile] = useState<File | null>(null);
   const [uploadingGpx, setUploadingGpx] = useState(false);
   const [currentGpxPath, setCurrentGpxPath] = useState<string | null>(null);
+
+  // Timing state
+  const [cutoffHours, setCutoffHours] = useState("");
+  const [catStart, setCatStart] = useState<Record<string, string>>({});
+  const [savingTiming, setSavingTiming] = useState(false);
 
   // Load data
   useEffect(() => {
@@ -66,11 +85,23 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
         setCategories(data.categories || []);
       }
       
-      // Load event data to get GPX file path
+      // Load event data to get GPX file path and timing
       const eventRes = await fetch(`/api/events?eventId=${eventId}`);
       if (eventRes.ok) {
         const eventData = await eventRes.json();
         setCurrentGpxPath(eventData.gpxFile || null);
+        
+        // Load timing data
+        if (eventData.cutoffMs != null) {
+          setCutoffHours(String(eventData.cutoffMs / 3600000));
+        } else {
+          setCutoffHours("");
+        }
+        if (eventData.categoryStartTimes) {
+          setCatStart(eventData.categoryStartTimes);
+        } else {
+          setCatStart({});
+        }
       }
     } catch (error) {
       console.error('Failed to load event data:', error);
@@ -323,6 +354,36 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
     }
   };
 
+  // Save timing rules
+  const saveTiming = async () => {
+    setSavingTiming(true);
+    try {
+      const h = Number(cutoffHours);
+      let cutoffMs: number | null = null;
+      if (Number.isFinite(h) && h > 0) {
+        cutoffMs = h * 3600000;
+      }
+
+      const res = await fetch(`/api/timing?eventId=${eventId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cutoffMs, categoryStartTimes: catStart }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to save");
+      }
+
+      bumpDataVersion();
+      alert("Timing rules berhasil disimpan!");
+    } catch (error: any) {
+      alert(`Error: ${error.message}`);
+    } finally {
+      setSavingTiming(false);
+    }
+  };
+
   const metaByKind: Partial<Record<CsvKind, { filename: string; updatedAt: number; rows: number }>> = {};
   csvMeta.forEach((x) => {
     metaByKind[x.key] = { filename: x.filename, updatedAt: x.updatedAt, rows: x.rows };
@@ -363,6 +424,12 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
           onClick={() => setActiveTab('data')}
         >
           Data Upload
+        </button>
+        <button 
+          className={`detail-tab whitespace-nowrap ${activeTab === 'timing' ? 'active' : ''}`}
+          onClick={() => setActiveTab('timing')}
+        >
+          Timing Rules
         </button>
         <button 
           className={`detail-tab whitespace-nowrap ${activeTab === 'banners' ? 'active' : ''}`}
@@ -814,6 +881,170 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
           {/* Info box */}
           <div className="mt-4 p-3 bg-blue-50 border border-blue-400 rounded text-blue-900 text-sm">
             <strong>Info:</strong> File GPX akan ditampilkan sebagai rute di halaman event publik.
+          </div>
+        </div>
+      )}
+
+      {/* Timing Rules Tab */}
+      {activeTab === 'timing' && (
+        <div className="space-y-4">
+          {/* Cut Off Time */}
+          <div className="card">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <div>
+                <h2 className="section-title">Cut Off Settings</h2>
+                <div className="subtle text-sm">
+                  Cut off time dihitung dari start masing-masing pelari / kategori.
+                </div>
+              </div>
+              <button className="btn w-full sm:w-auto" onClick={saveTiming} disabled={savingTiming}>
+                {savingTiming ? "Saving..." : "Save Timing Rules"}
+              </button>
+            </div>
+
+            <div className="admin-cutoff">
+              <div className="label font-medium text-sm mb-1">Cut Off Duration (hours)</div>
+              <div className="tools">
+                <input
+                  className="search w-full"
+                  placeholder="e.g. 3.5"
+                  value={cutoffHours}
+                  onChange={(e) => setCutoffHours(e.target.value)}
+                />
+              </div>
+              <div className="subtle text-sm mt-2">Jika kosong / 0 → cut off nonaktif.</div>
+            </div>
+          </div>
+
+          {/* Category Start Time Overrides */}
+          <div className="card">
+            <div className="mb-4">
+              <h2 className="section-title">Category Start Times</h2>
+              <div className="subtle text-sm">
+                Set start time per kategori. Jika diisi, sistem akan menghitung{" "}
+                <b>total time = finish time - start time kategori</b>.
+              </div>
+            </div>
+
+            {/* Desktop Table - hidden on mobile */}
+            <div className="hidden md:block table-wrap">
+              <table className="f1-table compact">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Start Time (datetime)</th>
+                    <th style={{ width: 200 }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categories.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="empty">No categories defined yet. Add categories first.</td>
+                    </tr>
+                  ) : (
+                    categories.map((catKey) => (
+                      <tr key={catKey} className="row-hover">
+                        <td className="name-cell">{catKey}</td>
+                        <td>
+                          <input
+                            className="search"
+                            style={{ width: "100%" }}
+                            placeholder="contoh: 2025-11-23 07:00:00.000"
+                            value={catStart[catKey] || ""}
+                            onChange={(e) =>
+                              setCatStart((prev) => ({
+                                ...prev,
+                                [catKey]: e.target.value,
+                              }))
+                            }
+                          />
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                            <button
+                              className="btn ghost"
+                              onClick={() =>
+                                setCatStart((prev) => ({
+                                  ...prev,
+                                  [catKey]: formatNowAsTimestamp(),
+                                }))
+                              }
+                            >
+                              Set Now
+                            </button>
+                            <button
+                              className="btn ghost"
+                              onClick={() =>
+                                setCatStart((prev) => ({
+                                  ...prev,
+                                  [catKey]: "",
+                                }))
+                              }
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards - visible only on mobile */}
+            <div className="md:hidden space-y-3">
+              {categories.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">No categories defined yet. Add categories first.</div>
+              ) : (
+                categories.map((catKey) => (
+                  <div key={catKey} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                    <div className="font-medium text-gray-900 mb-2">{catKey}</div>
+                    <input
+                      className="search w-full mb-2 text-sm"
+                      placeholder="2025-11-23 07:00:00.000"
+                      value={catStart[catKey] || ""}
+                      onChange={(e) =>
+                        setCatStart((prev) => ({
+                          ...prev,
+                          [catKey]: e.target.value,
+                        }))
+                      }
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        className="btn ghost flex-1 text-sm"
+                        onClick={() =>
+                          setCatStart((prev) => ({
+                            ...prev,
+                            [catKey]: formatNowAsTimestamp(),
+                          }))
+                        }
+                      >
+                        Set Now
+                      </button>
+                      <button
+                        className="btn ghost flex-1 text-sm"
+                        onClick={() =>
+                          setCatStart((prev) => ({
+                            ...prev,
+                            [catKey]: "",
+                          }))
+                        }
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="subtle text-sm mt-4">
+              Gunakan format tanggal &amp; jam yang sama dengan di CSV timing
+              (misal: <code>2025-11-23 07:00:00.000</code>). Kamu juga bisa klik <b>Set Now</b>
+              untuk mengisi otomatis berdasarkan jam saat ini.
+            </div>
           </div>
         </div>
       )}

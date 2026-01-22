@@ -4,10 +4,7 @@ import { Layout } from 'antd';
 import SidebarItem from './SidebarItem';
 import HomeIcon from './icons/HomeIcon';
 import EventsIcon from './icons/EventsIcon';
-import DataIcon from './icons/DataIcon';
 import BannersIcon from './icons/BannersIcon';
-import CategoriesIcon from './icons/CategoriesIcon';
-import ConfigIcon from './icons/ConfigIcon';
 import DQIcon from './icons/DQIcon';
 
 const { Sider } = Layout;
@@ -174,28 +171,10 @@ export const defaultMenuItems: MenuItem[] = [
     path: '/admin/events',
   },
   {
-    key: 'data',
-    label: 'Data Upload',
-    icon: <DataIcon />,
-    path: '/admin/data',
-  },
-  {
     key: 'banners',
     label: 'Banners',
     icon: <BannersIcon />,
     path: '/admin/banners',
-  },
-  {
-    key: 'categories',
-    label: 'Categories',
-    icon: <CategoriesIcon />,
-    path: '/admin/categories',
-  },
-  {
-    key: 'timing',
-    label: 'Timing Rules',
-    icon: <ConfigIcon />,
-    path: '/admin/timing',
   },
   {
     key: 'dq',

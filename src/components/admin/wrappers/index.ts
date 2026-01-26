@@ -4,4 +4,3 @@ export { default as DataPageWrapper } from './DataPageWrapper';
 export { default as BannersPageWrapper } from './BannersPageWrapper';
 export { default as CategoriesPageWrapper } from './CategoriesPageWrapper';
 export { default as TimingPageWrapper } from './TimingPageWrapper';
-export { default as DQPageWrapper } from './DQPageWrapper';

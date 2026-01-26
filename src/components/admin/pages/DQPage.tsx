@@ -5,25 +5,26 @@ interface DQPageProps {
   allRows: LeaderRow[];
   onConfigChanged: () => void;
   onDataVersionBump: () => void;
+  eventId: string;
 }
 
-const LS_DQ = "imr_dq_map";
-
-function loadDQMap(): Record<string, boolean> {
+function loadDQMap(eventId: string): Record<string, boolean> {
   try {
-    return JSON.parse(localStorage.getItem(LS_DQ) || "{}");
+    const key = `imr_dq_map_${eventId}`;
+    return JSON.parse(localStorage.getItem(key) || "{}");
   } catch {
     return {};
   }
 }
 
-function saveDQMap(map: Record<string, boolean>) {
-  localStorage.setItem(LS_DQ, JSON.stringify(map));
+function saveDQMap(map: Record<string, boolean>, eventId: string) {
+  const key = `imr_dq_map_${eventId}`;
+  localStorage.setItem(key, JSON.stringify(map));
 }
 
-export default function DQPage({ allRows, onConfigChanged, onDataVersionBump }: DQPageProps) {
+export default function DQPage({ allRows, onConfigChanged, onDataVersionBump, eventId }: DQPageProps) {
   const [q, setQ] = useState("");
-  const [dqMap, setDqMap] = useState<Record<string, boolean>>(loadDQMap());
+  const [dqMap, setDqMap] = useState<Record<string, boolean>>(loadDQMap(eventId));
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
@@ -39,7 +40,7 @@ export default function DQPage({ allRows, onConfigChanged, onDataVersionBump }: 
     const next = { ...dqMap, [epc]: !dqMap[epc] };
     if (!next[epc]) delete next[epc];
     setDqMap(next);
-    saveDQMap(next);
+    saveDQMap(next, eventId);
     onDataVersionBump();
     onConfigChanged();
   };

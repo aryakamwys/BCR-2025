@@ -5,7 +5,6 @@ import SidebarItem from './SidebarItem';
 import HomeIcon from './icons/HomeIcon';
 import EventsIcon from './icons/EventsIcon';
 import BannersIcon from './icons/BannersIcon';
-import DQIcon from './icons/DQIcon';
 
 const { Sider } = Layout;
 
@@ -175,11 +174,5 @@ export const defaultMenuItems: MenuItem[] = [
     label: 'Banners',
     icon: <BannersIcon />,
     path: '/admin/banners',
-  },
-  {
-    key: 'dq',
-    label: 'DQ / DNF',
-    icon: <DQIcon />,
-    path: '/admin/dq',
   },
 ];

@@ -6,11 +6,10 @@ import parseTimeToMs, { extractTimeOfDay, formatDuration } from '../../../lib/ti
 import OverviewPage from '../pages/OverviewPage';
 import type { LeaderRow } from '../../LeaderboardTable';
 
-const LS_DQ = "imr_dq_map";
-
-function loadDQMap(): Record<string, boolean> {
+function loadDQMap(eventId: string): Record<string, boolean> {
   try {
-    return JSON.parse(localStorage.getItem(LS_DQ) || "{}");
+    const key = `imr_dq_map_${eventId}`;
+    return JSON.parse(localStorage.getItem(key) || "{}");
   } catch {
     return {};
   }
@@ -40,7 +39,7 @@ export default function OverviewPageWrapper() {
 
         // Use timing from event (per-event database) instead of localStorage
         const cutoffMs = currentEvent?.cutoffMs ?? null;
-        const dqMap = loadDQMap();
+        const dqMap = loadDQMap(eventId);
         const catStartRaw: Record<string, string> = (currentEvent?.categoryStartTimes as Record<string, string>) ?? {};
 
         const absOverrideMs: Record<string, number | null> = {};

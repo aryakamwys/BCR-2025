@@ -15,7 +15,14 @@ import {
 import { LS_DATA_VERSION } from "../lib/config";
 import parseTimeToMs, { extractTimeOfDay, formatDuration } from "../lib/time";
 
-const LS_DQ = "imr_dq_map";
+function loadDQMap(eventId: string): Record<string, boolean> {
+  try {
+    const key = `imr_dq_map_${eventId}`;
+    return JSON.parse(localStorage.getItem(key) || "{}");
+  } catch {
+    return {};
+  }
+}
 
 interface EventData {
   id: string;
@@ -39,14 +46,6 @@ interface Banner {
   alt?: string;
   order: number;
   isActive: boolean;
-}
-
-function loadDQMap(): Record<string, boolean> {
-  try {
-    return JSON.parse(localStorage.getItem(LS_DQ) || "{}");
-  } catch {
-    return {};
-  }
 }
 
 type LoadState =
@@ -192,7 +191,7 @@ export default function EventPage() {
 
         // Use timing from event (per-event database) instead of localStorage
         const cutoffMs = event.cutoffMs ?? null;
-        const dqMap = loadDQMap();
+        const dqMap = loadDQMap(event.id);
         const catStartRaw = event.categoryStartTimes ?? {};
 
         const absOverrideMs: Record<string, number | null> = {};
@@ -306,7 +305,7 @@ export default function EventPage() {
         });
 
         const categoryRankByEpc = new Map<string, number>();
-        (event.categories || []).forEach((catKey) => {
+        (event.categories || []).forEach((catKey: string) => {
           const list = finisherSorted.filter((r) => r.sourceCategoryKey === catKey);
           list.forEach((r, i) => categoryRankByEpc.set(r.epc, i + 1));
         });

@@ -9,7 +9,6 @@ import DataPage from "./pages/DataPage";
 import BannersPage from "./pages/BannersPage";
 import CategoriesPage from "./pages/CategoriesPage";
 import TimingPage from "./pages/TimingPage";
-import DQPage from "./pages/DQPage";
 
 interface AdminPageContentProps {
   activeSection: string;
@@ -164,15 +163,6 @@ export default function AdminPageContent({ activeSection, allRows, onConfigChang
         <TimingPage
           categories={categories}
           eventId={eventId || null}
-          onConfigChanged={onConfigChanged}
-          onDataVersionBump={bumpDataVersion}
-        />
-      );
-
-    case 'dsq':
-      return (
-        <DQPage
-          allRows={allRows}
           onConfigChanged={onConfigChanged}
           onDataVersionBump={bumpDataVersion}
         />

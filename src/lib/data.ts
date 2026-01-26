@@ -100,11 +100,12 @@ export async function loadMasterParticipants(
   all: MasterParticipant[];
   byCategoryKey: Record<string, MasterParticipant[]>;
   byEpc: Map<string, MasterParticipant>;
+  uniqueCategories: string[];
 }> {
   const text = await requireCsvText("master", eventId);
   const grid = parseCsv(text);
   if (!grid || grid.length <= 1) {
-    return { all: [], byCategoryKey: {}, byEpc: new Map() };
+    return { all: [], byCategoryKey: {}, byEpc: new Map(), uniqueCategories: [] };
   }
 
   const headers = (grid[0] || []).map(String);
@@ -120,7 +121,9 @@ export async function loadMasterParticipants(
 
   const byEpc = new Map<string, MasterParticipant>();
   const byCategoryKey: Record<string, MasterParticipant[]> = {};
-  CATEGORY_KEYS.forEach((k) => (byCategoryKey[k] = []));
+
+  // Track unique categories from CSV
+  const uniqueCategoriesSet = new Set<string>();
 
   grid.slice(1).forEach((r) => {
     const epc = String(r[epcIdx] ?? "").trim();
@@ -129,7 +132,14 @@ export async function loadMasterParticipants(
     const rawGender = genderIdx >= 0 ? String(r[genderIdx] ?? "").trim() : "";
     const rawCategory = categoryIdx >= 0 ? String(r[categoryIdx] ?? "").trim() : "";
 
-    const catKey = normalizeCategoryFromMaster({ rawCategory, rawGender });
+    // Use original category from CSV, not normalized
+    const category = rawCategory || "Uncategorized";
+
+    // Track unique categories
+    if (rawCategory) {
+      uniqueCategoriesSet.add(rawCategory);
+    }
+
     const gender = normalizeGender(rawGender);
 
     const p: MasterParticipant = {
@@ -137,20 +147,30 @@ export async function loadMasterParticipants(
       bib: bibIdx >= 0 ? String(r[bibIdx] ?? "").trim() : "",
       name: nameIdx >= 0 ? String(r[nameIdx] ?? "").trim() : "",
       gender,
-      category: catKey,
-      sourceCategoryKey: catKey,
+      category: category,
+      sourceCategoryKey: category,
     };
 
     byEpc.set(epc, p);
   });
 
   const all = Array.from(byEpc.values());
+
+  // Group by original category name
   all.forEach((p) => {
-    if (!byCategoryKey[p.sourceCategoryKey]) byCategoryKey[p.sourceCategoryKey] = [];
-    byCategoryKey[p.sourceCategoryKey].push(p);
+    const catKey = p.category;
+    if (!byCategoryKey[catKey]) {
+      byCategoryKey[catKey] = [];
+    }
+    byCategoryKey[catKey].push(p);
   });
 
-  return { all, byCategoryKey, byEpc };
+  return {
+    all,
+    byCategoryKey,
+    byEpc,
+    uniqueCategories: Array.from(uniqueCategoriesSet).sort()
+  };
 }
 
 export type TimeEntry = { ms: number | null; raw: string };

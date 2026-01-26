@@ -1,10 +1,13 @@
 // Admin Event Detail Page - for managing individual event data, CSV uploads, banners, categories
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { putCsvFile, deleteCsvFile, listCsvMeta } from "../../../lib/idb";
 import { parseCsv, countDataRows } from "../../../lib/csvParse";
 import { uploadBannerViaApi } from "../../../lib/storage";
 import type { CsvKind } from "../../../lib/config";
 import { LS_DATA_VERSION } from "../../../lib/config";
+import { loadMasterParticipants, loadTimesMap } from "../../../lib/data";
+import parseTimeToMs, { extractTimeOfDay, formatDuration } from "../../../lib/time";
+import type { LeaderRow } from "../../LeaderboardTable";
 
 interface EventDetailPageProps {
   eventId: string;
@@ -36,19 +39,19 @@ function formatNowAsTimestamp(): string {
 }
 
 export default function EventDetailPage({ eventId, eventSlug, eventName, onBack }: EventDetailPageProps) {
-  const [activeTab, setActiveTab] = useState<'data' | 'banners' | 'categories' | 'route' | 'timing'>('data');
+  const [activeTab, setActiveTab] = useState<'data' | 'banners' | 'categories' | 'route' | 'timing' | 'dq'>('data');
   const [csvMeta, setCsvMeta] = useState<Array<{ key: CsvKind; filename: string; updatedAt: number; rows: number }>>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Banner upload state
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
-  
+
   // Category state
   const [newCategory, setNewCategory] = useState('');
-  
+
   // GPX upload state
   const [gpxFile, setGpxFile] = useState<File | null>(null);
   const [uploadingGpx, setUploadingGpx] = useState(false);
@@ -59,10 +62,23 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
   const [catStart, setCatStart] = useState<Record<string, string>>({});
   const [savingTiming, setSavingTiming] = useState(false);
 
+  // DQ state
+  const [allRows, setAllRows] = useState<LeaderRow[]>([]);
+  const [dqSearch, setDqSearch] = useState("");
+  const [dqMap, setDqMap] = useState<Record<string, boolean>>({});
+  const [eventData, setEventData] = useState<any>(null);
+
   // Load data
   useEffect(() => {
     loadAllData();
   }, [eventId]);
+
+  // Load DQ data when switching to DQ tab
+  useEffect(() => {
+    if (activeTab === 'dq') {
+      loadDQData();
+    }
+  }, [activeTab, eventId]);
 
   const loadAllData = async () => {
     setLoading(true);
@@ -70,27 +86,28 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
       // Load CSV meta
       const meta = await listCsvMeta(eventId);
       setCsvMeta(meta as any);
-      
+
       // Load banners
       const bannersRes = await fetch(`/api/banners?eventId=${eventId}`);
       if (bannersRes.ok) {
         const data = await bannersRes.json();
         setBanners(Array.isArray(data) ? data : []);
       }
-      
+
       // Load categories
       const catRes = await fetch(`/api/categories?eventId=${eventId}`);
       if (catRes.ok) {
         const data = await catRes.json();
         setCategories(data.categories || []);
       }
-      
+
       // Load event data to get GPX file path and timing
       const eventRes = await fetch(`/api/events?eventId=${eventId}`);
       if (eventRes.ok) {
         const eventData = await eventRes.json();
+        setEventData(eventData);
         setCurrentGpxPath(eventData.gpxFile || null);
-        
+
         // Load timing data
         if (eventData.cutoffMs != null) {
           setCutoffHours(String(eventData.cutoffMs / 3600000));
@@ -107,6 +124,127 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
       console.error('Failed to load event data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDQData = async () => {
+    try {
+      const master = await loadMasterParticipants(eventId);
+      const startMap = await loadTimesMap("start", eventId);
+      const finishMap = await loadTimesMap("finish", eventId);
+
+      const cutoffMs = eventData?.cutoffMs ?? null;
+      const catStartRaw: Record<string, string> = (eventData?.categoryStartTimes as Record<string, string>) ?? {};
+
+      // Load DQ map from localStorage
+      const dqKey = `imr_dq_map_${eventId}`;
+      let dqData: Record<string, boolean> = {};
+      try {
+        dqData = JSON.parse(localStorage.getItem(dqKey) || "{}");
+      } catch {
+        dqData = {};
+      }
+      setDqMap(dqData);
+
+      const absOverrideMs: Record<string, number | null> = {};
+      const timeOnlyStr: Record<string, string | null> = {};
+
+      Object.entries(catStartRaw).forEach(([key, raw]) => {
+        const s = String(raw || "").trim();
+        if (!s) {
+          absOverrideMs[key] = null;
+          timeOnlyStr[key] = null;
+          return;
+        }
+        if (/\d{4}-\d{2}-\d{2}/.test(s)) {
+          const parsed = parseTimeToMs(s);
+          absOverrideMs[key] = parsed.ms;
+          timeOnlyStr[key] = null;
+        } else {
+          absOverrideMs[key] = null;
+          timeOnlyStr[key] = s;
+        }
+      });
+
+      function buildOverrideFromFinishDate(finishMs: number, timeStr: string): number | null {
+        const m = timeStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.(\d{1,3}))?/);
+        if (!m) return null;
+
+        const h = Number(m[1] || 0);
+        const mi = Number(m[2] || 0);
+        const se = Number(m[3] || 0);
+        const ms = m[4] ? Number(String(m[4]).padEnd(3, "0").slice(0, 3)) : 0;
+
+        const d = new Date(finishMs);
+        const override = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, mi, se, ms);
+        return override.getTime();
+      }
+
+      const baseRows: LeaderRow[] = [];
+
+      master.all.forEach((p) => {
+        const finishEntry = finishMap.get(p.epc);
+        if (!finishEntry?.ms) return;
+
+        const catKey = p.sourceCategoryKey;
+        const absMs = absOverrideMs[catKey] ?? null;
+        const timeOnly = timeOnlyStr[catKey] ?? null;
+
+        let total: number | null = null;
+
+        if (absMs != null && Number.isFinite(absMs)) {
+          const delta = finishEntry.ms - absMs;
+          if (Number.isFinite(delta) && delta >= 0) {
+            total = delta;
+          } else {
+            const startEntry = startMap.get(p.epc);
+            if (!startEntry?.ms) return;
+            total = finishEntry.ms - startEntry.ms;
+          }
+        } else if (timeOnly) {
+          const builtOverride = buildOverrideFromFinishDate(finishEntry.ms, timeOnly);
+          if (builtOverride != null) {
+            const delta = finishEntry.ms - builtOverride;
+            if (Number.isFinite(delta) && delta >= 0) {
+              total = delta;
+            } else {
+              const startEntry = startMap.get(p.epc);
+              if (!startEntry?.ms) return;
+              total = finishEntry.ms - startEntry.ms;
+            }
+          } else {
+            const startEntry = startMap.get(p.epc);
+            if (!startEntry?.ms) return;
+            total = finishEntry.ms - startEntry.ms;
+          }
+        } else {
+          const startEntry = startMap.get(p.epc);
+          if (!startEntry?.ms) return;
+          total = finishEntry.ms - startEntry.ms;
+        }
+
+        if (!Number.isFinite(total) || total == null || total < 0) return;
+
+        const isDQ = !!dqData[p.epc];
+        const isDNF = cutoffMs != null && total > cutoffMs;
+
+        baseRows.push({
+          rank: null,
+          bib: p.bib,
+          name: p.name,
+          gender: p.gender,
+          category: p.category || p.sourceCategoryKey,
+          sourceCategoryKey: p.sourceCategoryKey,
+          finishTimeRaw: extractTimeOfDay(finishEntry.raw),
+          totalTimeMs: total,
+          totalTimeDisplay: isDQ ? "DSQ" : isDNF ? "DNF" : formatDuration(total),
+          epc: p.epc,
+        });
+      });
+
+      setAllRows(baseRows);
+    } catch (error) {
+      console.error('Failed to load DQ data:', error);
     }
   };
 
@@ -384,6 +522,37 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
     }
   };
 
+  // Toggle DQ
+  const toggleDQ = (epc: string) => {
+    const next = { ...dqMap, [epc]: !dqMap[epc] };
+    if (!next[epc]) delete next[epc];
+    setDqMap(next);
+
+    const dqKey = `imr_dq_map_${eventId}`;
+    localStorage.setItem(dqKey, JSON.stringify(next));
+
+    bumpDataVersion();
+
+    // Update all rows to reflect DQ status
+    const updatedRows = allRows.map(row =>
+      row.epc === epc
+        ? { ...row, totalTimeDisplay: next[epc] ? "DSQ" : formatDuration(row.totalTimeMs) }
+        : row
+    );
+    setAllRows(updatedRows);
+  };
+
+  // Filter rows for DQ tab
+  const filteredDqRows = useMemo(() => {
+    const query = dqSearch.trim().toLowerCase();
+    if (!query) return allRows;
+    return allRows.filter(
+      (r) =>
+        (r.bib || "").toLowerCase().includes(query) ||
+        (r.name || "").toLowerCase().includes(query)
+    );
+  }, [dqSearch, allRows]);
+
   const metaByKind: Partial<Record<CsvKind, { filename: string; updatedAt: number; rows: number }>> = {};
   csvMeta.forEach((x) => {
     metaByKind[x.key] = { filename: x.filename, updatedAt: x.updatedAt, rows: x.rows };
@@ -419,35 +588,41 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
 
       {/* Tabs - scrollable on mobile */}
       <div className="flex gap-1 mb-4 overflow-x-auto pb-2 border-b-2 border-gray-200 -mx-3 px-3 md:mx-0 md:px-0">
-        <button 
+        <button
           className={`detail-tab whitespace-nowrap ${activeTab === 'data' ? 'active' : ''}`}
           onClick={() => setActiveTab('data')}
         >
           Data Upload
         </button>
-        <button 
+        <button
           className={`detail-tab whitespace-nowrap ${activeTab === 'timing' ? 'active' : ''}`}
           onClick={() => setActiveTab('timing')}
         >
           Timing Rules
         </button>
-        <button 
+        <button
           className={`detail-tab whitespace-nowrap ${activeTab === 'banners' ? 'active' : ''}`}
           onClick={() => setActiveTab('banners')}
         >
           Banners ({banners.length})
         </button>
-        <button 
+        <button
           className={`detail-tab whitespace-nowrap ${activeTab === 'categories' ? 'active' : ''}`}
           onClick={() => setActiveTab('categories')}
         >
           Categories ({categories.length})
         </button>
-        <button 
+        <button
           className={`detail-tab whitespace-nowrap ${activeTab === 'route' ? 'active' : ''}`}
           onClick={() => setActiveTab('route')}
         >
           Route {currentGpxPath ? '(1)' : '(0)'}
+        </button>
+        <button
+          className={`detail-tab whitespace-nowrap ${activeTab === 'dq' ? 'active' : ''}`}
+          onClick={() => setActiveTab('dq')}
+        >
+          DQ / DNF
         </button>
       </div>
 
@@ -1045,6 +1220,122 @@ export default function EventDetailPage({ eventId, eventSlug, eventName, onBack 
               (misal: <code>2025-11-23 07:00:00.000</code>). Kamu juga bisa klik <b>Set Now</b>
               untuk mengisi otomatis berdasarkan jam saat ini.
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* DQ / DNF Tab */}
+      {activeTab === 'dq' && (
+        <div className="card">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+            <div>
+              <h2 className="section-title">Disqualification (Manual)</h2>
+              <div className="subtle text-sm">
+                Toggle DSQ per runner (by EPC). DSQ tetap tampil di tabel tapi tanpa rank.
+              </div>
+            </div>
+            <input
+              className="search w-full sm:w-64"
+              placeholder="Search BIB / Name…"
+              value={dqSearch}
+              onChange={(e) => setDqSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Desktop Table - hidden on mobile */}
+          <div className="hidden md:block table-wrap">
+            <table className="f1-table">
+              <thead>
+                <tr>
+                  <th className="col-bib">BIB</th>
+                  <th>NAME</th>
+                  <th className="col-gender">GENDER</th>
+                  <th className="col-cat">CATEGORY</th>
+                  <th style={{ width: 120 }}>STATUS</th>
+                  <th style={{ width: 120 }}>ACTION</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDqRows.map((r) => {
+                  const isDQ = !!dqMap[r.epc];
+                  return (
+                    <tr key={r.epc} className="row-hover">
+                      <td className="mono">{r.bib}</td>
+                      <td className="name-cell">{r.name}</td>
+                      <td>{r.gender}</td>
+                      <td>{r.category}</td>
+                      <td className="mono strong">{isDQ ? "DSQ" : "OK"}</td>
+                      <td>
+                        <button
+                          className="btn ghost"
+                          onClick={() => toggleDQ(r.epc)}
+                        >
+                          {isDQ ? "Undo DSQ" : "Disqualify"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredDqRows.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="empty">
+                      {allRows.length === 0
+                        ? "Upload data CSV terlebih dahulu di tab Data Upload."
+                        : "Tidak ada peserta yang cocok."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Cards - visible only on mobile */}
+          <div className="md:hidden space-y-3">
+            {filteredDqRows.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">
+                {allRows.length === 0
+                  ? "Upload data CSV terlebih dahulu di tab Data Upload."
+                  : "Tidak ada peserta yang cocok."}
+              </div>
+            ) : (
+              filteredDqRows.map((r) => {
+                const isDQ = !!dqMap[r.epc];
+                return (
+                  <div key={r.epc} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <div className="font-semibold text-gray-900">{r.name}</div>
+                        <div className="text-sm text-gray-500">
+                          <span className="mono">BIB: {r.bib}</span>
+                          <span className="mx-2">·</span>
+                          <span>{r.gender}</span>
+                        </div>
+                        <div className="text-xs text-gray-400">{r.category}</div>
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-bold ${
+                          isDQ
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-green-100 text-green-700'
+                        }`}
+                      >
+                        {isDQ ? "DSQ" : "OK"}
+                      </span>
+                    </div>
+                    <button
+                      className={`btn w-full text-sm ${isDQ ? '' : 'ghost'}`}
+                      onClick={() => toggleDQ(r.epc)}
+                    >
+                      {isDQ ? "Undo DSQ" : "Disqualify"}
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-400 rounded-lg text-blue-900 text-sm">
+            <strong>Info:</strong> Total {Object.values(dqMap).filter(Boolean).length} peserta di-DSQ.
           </div>
         </div>
       )}

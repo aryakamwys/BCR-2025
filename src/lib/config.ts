@@ -15,6 +15,11 @@ export const LS_EVENT_TITLE = "imr_event_title";
 export const LS_DATA_VERSION = "imr_data_version";
 export const LS_CUTOFF = "imr_cutoff_ms";
 export const LS_DQ = "imr_dq_map";
+
+// Helper to get per-event localStorage key
+export function getDQLocalStorageKey(eventId: string): string {
+  return `${LS_DQ}_${eventId}`;
+}
 export const LS_CAT_START = "imr_cat_start_raw";
 
 export const DB_NAME = "imr_timing_db";

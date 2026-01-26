@@ -16,8 +16,7 @@ import AdminLayout from "./components/admin/AdminLayout";
 import {
   OverviewPageWrapper,
   EventsPageWrapper,
-  BannersPageWrapper,
-  DQPageWrapper
+  BannersPageWrapper
 } from "./components/admin/wrappers";
 import { EventProvider, useEvent } from "./contexts/EventContext";
 import {
@@ -28,11 +27,10 @@ import {
 import { DEFAULT_EVENT_TITLE, LS_EVENT_TITLE, LS_DATA_VERSION } from "./lib/config";
 import parseTimeToMs, { extractTimeOfDay, formatDuration } from "./lib/time";
 
-const LS_DQ = "imr_dq_map";
-
-function loadDQMap(): Record<string, boolean> {
+function loadDQMap(eventId: string): Record<string, boolean> {
   try {
-    return JSON.parse(localStorage.getItem(LS_DQ) || "{}");
+    const key = `imr_dq_map_${eventId}`;
+    return JSON.parse(localStorage.getItem(key) || "{}");
   } catch {
     return {};
   }
@@ -122,7 +120,7 @@ function LeaderboardApp() {
 
         // Use timing from event (per-event database) instead of localStorage
         const cutoffMs = currentEvent?.cutoffMs ?? null;
-        const dqMap = loadDQMap();
+        const dqMap = loadDQMap(eventId);
         const catStartRaw: Record<string, string> = (currentEvent?.categoryStartTimes as Record<string, string>) ?? {};
 
         const absOverrideMs: Record<string, number | null> = {};
@@ -593,7 +591,6 @@ export default function App() {
           <Route path="overview" element={<OverviewPageWrapper />} />
           <Route path="events" element={<EventsPageWrapper />} />
           <Route path="banners" element={<BannersPageWrapper />} />
-          <Route path="dq" element={<DQPageWrapper />} />
         </Route>
       </Routes>
     </EventProvider>

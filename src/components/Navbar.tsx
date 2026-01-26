@@ -19,7 +19,7 @@ export default function Navbar({ showAdminButton = false }: NavbarProps) {
 
   return (
     <nav className="bg-white border-b-2 border-red-500 shadow-md sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
+      <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8">
         <div className="flex justify-between items-center h-14 md:h-16 lg:h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">

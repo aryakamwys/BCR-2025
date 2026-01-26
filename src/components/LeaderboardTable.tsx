@@ -135,7 +135,7 @@ export default function LeaderboardTable({
       </div>
 
       {/* Mobile Card View */}
-      <div className="md:hidden mt-4 space-y-3 max-h-[70vh] overflow-y-auto">
+      <div className="md:hidden mt-4 space-y-3 max-h-[70vh] overflow-y-auto px-0">
         {filtered.map((r) => (
           <MobileCard key={r.epc} r={r} />
         ))}

@@ -818,6 +818,7 @@ export default function EventPage() {
             max-width: 1200px;
             margin: 0 auto;
             padding: 1.5rem 2rem;
+            width: 100%;
           }
 
           .content-section {
@@ -825,6 +826,7 @@ export default function EventPage() {
             border-radius: 8px;
             padding: 1.5rem;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            overflow-x: hidden;
           }
 
           .section-title {
@@ -953,11 +955,16 @@ export default function EventPage() {
             }
 
             .event-content {
-              padding: 1rem;
+              padding: 0;
+              margin: 0;
+              max-width: 100%;
+              width: 100%;
             }
 
             .content-section {
               padding: 1rem;
+              margin: 1rem;
+              border-radius: 0;
             }
 
             .simple-stats {
@@ -977,6 +984,22 @@ export default function EventPage() {
 
             .route-map-container iframe {
               height: 300px;
+            }
+
+            /* Fix table overflow on mobile */
+            .content-section .table-wrap {
+              width: calc(100% + 2rem);
+              margin-left: -1rem;
+              margin-right: -1rem;
+              border-left: none;
+              border-right: none;
+              border-radius: 0;
+            }
+
+            .content-section .card {
+              border-radius: 0;
+              border-left: none;
+              border-right: none;
             }
           }
 
